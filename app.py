@@ -167,18 +167,68 @@ Examples: {examples_by_cat}
 # Streamlit App
 # =================
 
-st.set_page_config(page_title="Complaint Analyzer — Gemini Demo", layout="wide")
+page = st.sidebar.radio(
+    "Navigate",
+    [
+        "Upload & Preview",
+        "Overview",
+        "Triage Queue",
+        "Similar Cases & Draft Reply (GenAI)",
+        "Weekly Top-3 Report (GenAI)",
+        "Settings"
+    ]
+)
 
-if "data" not in st.session_state:
-    st.session_state.data = None
-if "clf" not in st.session_state:
-    st.session_state.clf = quickfit_dummy_classifier()
-if "vec" not in st.session_state:
-    st.session_state.vec = None
-if "nn" not in st.session_state:
-    st.session_state.nn = None
-if "Xvec" not in st.session_state:
-    st.session_state.Xvec = None
+# --- Main Pages ---
+if page == "Upload & Preview":
+    st.title("📂 Upload & Preview")
+    uploaded = st.file_uploader("Upload a CSV with complaints", type=["csv"])
+    if uploaded:
+        df = pd.read_csv(uploaded)
+        st.write("✅ Complaints uploaded successfully. Preview below:")
+        st.dataframe(df.head())
+    else:
+        st.info("Upload a file to get started.")
+
+elif page == "Overview":
+    st.title("📊 Overview")
+    st.write("High-level KPIs and charts go here.")
+    st.metric("Total Complaints", "1234")
+    st.metric("Unique Categories", "8")
+    st.metric("Last 7 Days", "245")
+
+elif page == "Triage Queue":
+    st.title("🗂️ Triage Queue")
+    st.write("Filter and browse complaints here.")
+    st.selectbox("Filter by category", ["All", "ATM Issues", "Mobile App", "Loans"])
+    st.selectbox("Filter by source", ["All", "Email", "Call Center", "Social Media"])
+    st.write("📋 List of complaints will appear here...")
+
+elif page == "Similar Cases & Draft Reply (GenAI)":
+    st.title("🤖 Similar Cases & Draft Reply")
+    complaint_text = st.text_area("Paste a complaint to analyze")
+    if st.button("Generate Draft Reply"):
+        if st.session_state.api_key:
+            st.success("✅ GenAI draft reply (placeholder):\n\nDear customer, we are sorry...")
+        else:
+            st.warning("No API key provided. Cannot call GenAI.")
+
+elif page == "Weekly Top-3 Report (GenAI)":
+    st.title("📅 Weekly Top-3 Report")
+    if st.button("Generate Weekly Report"):
+        if st.session_state.api_key:
+            st.success("✅ GenAI Weekly Report (placeholder):\n\n1. ATM Issues\n2. Mobile App Bugs\n3. Loan Disputes")
+        else:
+            st.warning("No API key provided. Cannot call GenAI.")
+
+elif page == "Settings":
+    st.title("⚙️ Settings")
+    st.write("Demo settings and model info.")
+    st.json({
+        "Categories": ["ATM Issues", "Mobile App", "Loan Disputes"],
+        "PII Redaction": True,
+        "Model": "Gemini Pro (demo)"
+    })
 
 # 🔑 Load API key from Streamlit secrets
 st.session_state.api_key = st.secrets.get("GEMINI_API_KEY", "")
@@ -191,9 +241,3 @@ st.session_state.api_key = st.sidebar.text_input(
     type="password"
 )
 
-page = st.sidebar.radio("Navigate", [
-    "1) Upload & Preview","2) Overview","3) Triage Queue",
-    "4) Similar Cases & Draft Reply (GenAI)","5) Weekly Top-3 Report (GenAI)","6) Settings"
-])
-
-# (rest of your UI code is unchanged, just calling llm_draft_reply/llm_weekly_summary with get_gemini_client)
