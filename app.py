@@ -686,7 +686,7 @@ def generate_sample_data():
         'severity': np.random.choice(['low', 'medium', 'high'], 100, p=[0.4, 0.4, 0.2]),
         'status': np.random.choice(['Open', 'In Progress', 'Closed'], 100, p=[0.2, 0.3, 0.5]),
         'region': np.random.choice(['Bakı', 'Gəncə', 'Sumqayıt', 'Mingəçevir', 'Şəki'], 100)
-    }
+    }[:100],
     
     # Sample loan/credit data
     loan_data = {
@@ -701,7 +701,7 @@ def generate_sample_data():
         'loan_to_value': np.random.beta(3, 2, 200),
         'tenure_months': np.random.randint(6, 120, 200),
         'region': np.random.choice(['Bakı', 'Gəncə', 'Sumqayıt', 'Mingəçevir', 'Şəki'], 200)
-    }
+    }[:100],
     
     # Sample customer data for product insights
     customer_data = {
@@ -713,7 +713,7 @@ def generate_sample_data():
         'region': np.random.choice(['Bakı', 'Gəncə', 'Sumqayıt', 'Mingəçevir', 'Şəki'], 300),
         'last_transaction_days': np.random.randint(1, 90, 300),
         'digital_adoption': np.random.choice(['High', 'Medium', 'Low'], 300, p=[0.3, 0.5, 0.2])
-    }
+    }[:100],
     
     return pd.DataFrame(complaint_data), pd.DataFrame(loan_data), pd.DataFrame(customer_data)
 
