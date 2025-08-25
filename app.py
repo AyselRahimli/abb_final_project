@@ -123,7 +123,7 @@ TRANSLATIONS = {
         'propensity_score': 'Meyillik Xalı',
         'search_knowledge': 'Bilik bazasında axtarış',
         'ask_question': 'Sual verin'
-    }[:500],
+    },
     'en': {
         'title': 'Bank360 - GenAI Customer Analytics & Insights Platform',
         'home': 'Home',
