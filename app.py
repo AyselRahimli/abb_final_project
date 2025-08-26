@@ -1332,7 +1332,7 @@ def knowledge_search_page(gemini_api: GeminiAPI):
 
     st.session_state.knowledge_base = kb
 
-kb = st.session_state.knowledge_base
+    kb = st.session_state.knowledge_base
 
     
     # Document management
