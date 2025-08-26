@@ -1383,7 +1383,7 @@ def main():
     if not st.session_state.gemini_api_key:
         try:
             st.session_state.gemini_api_key = st.secrets["gcp"]["gemini_api_key"]
-       except Exception as e:
+        except Exception as e:
             st.warning("Gemini API açarı tapılmadı. Zəhmət olmasa əl ilə daxil edin.")
 
     # Initialize Gemini API wrapper
