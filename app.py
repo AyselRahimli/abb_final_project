@@ -1308,31 +1308,32 @@ def knowledge_search_page(gemini_api: GeminiAPI):
     st.header(t('knowledge_search'))
     
     # Initialize knowledge base
-    if 'knowledge_base' not in st.session_state:
-        kb = KnowledgeBase(gemini_api)
-        
-        # Add sample documents
-        sample_docs = [
-            {
-                'title': 'Kredit Kartı Qaydaları',
-                'content': 'Kredit kartının istifadə qaydaları, komissiyalar və məhdudiyyətlər haqqında ətraflı məlumat. Aylıq komissiya 2 AZN, nağd pul çıxarma komissiyası 1.5%.',
-            },
-            {
-                'title': 'Mobil Banking',
-                'content': 'Mobil tətbiq vasitəsilə bank əməliyyatları, pul köçürmələri və hesabların idarə edilməsi. 24/7 xidmət, biometrik təhlükəsizlik.',
-            },
-            {
-                'title': 'Kredit Şərtləri',
-                'content': 'Fərdi kreditlərin şərtləri: minimum gəlir 500 AZN, maksimum məbləğ 50,000 AZN, müddət 5 ilə qədər, faiz dərəcəsi 12-18%.',
-            }
-        ]
-        
-        for doc in sample_docs:
-            kb.add_document(doc['title'], doc['content'])
-        
-        st.session_state.knowledge_base = kb
-    
-    kb = st.session_state.knowledge_base
+    if 'knowledge_base' not in st.session_state or not isinstance(st.session_state.knowledge_base, KnowledgeBase):
+    kb = KnowledgeBase(gemini_api)
+
+    # Add sample documents
+    sample_docs = [
+        {
+            'title': 'Kredit Kartı Qaydaları',
+            'content': 'Kredit kartının istifadə qaydaları, komissiyalar və məhdudiyyətlər haqqında ətraflı məlumat. Aylıq komissiya 2 AZN, nağd pul çıxarma komissiyası 1.5%.',
+        },
+        {
+            'title': 'Mobil Banking',
+            'content': 'Mobil tətbiq vasitəsilə bank əməliyyatları, pul köçürmələri və hesabların idarə edilməsi. 24/7 xidmət, biometrik təhlükəsizlik.',
+        },
+        {
+            'title': 'Kredit Şərtləri',
+            'content': 'Fərdi kreditlərin şərtləri: minimum gəlir 500 AZN, maksimum məbləğ 50,000 AZN, müddət 5 ilə qədər, faiz dərəcəsi 12-18%.',
+        }
+    ]
+
+    for doc in sample_docs:
+        kb.add_document(doc['title'], doc['content'])
+
+    st.session_state.knowledge_base = kb
+
+kb = st.session_state.knowledge_base
+
     
     # Document management
     st.subheader("Knowledge Base Management")
