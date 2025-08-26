@@ -1379,12 +1379,14 @@ def knowledge_search_page(gemini_api: GeminiAPI):
                     st.write(doc['content'][:300] + "...")
 
 def main():
-    # Əgər istifadəçi API açarını daxil etməyibsə, secrets-dən yüklə
+    # API açarını əvvəlcə secrets-dən yükləməyə cəhd et
     if not st.session_state.gemini_api_key:
         try:
             st.session_state.gemini_api_key = st.secrets["gcp"]["gemini_api_key"]
-        except Exception as e:
+            st.toast("Gemini API açarı secrets-dən yükləndi", icon="🔐")
+        except Exception:
             st.warning("Gemini API açarı tapılmadı. Zəhmət olmasa əl ilə daxil edin.")
+
 
     # Initialize Gemini API wrapper
     gemini_api = GeminiAPI(api_key=st.session_state.gemini_api_key)
