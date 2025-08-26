@@ -1309,7 +1309,7 @@ def knowledge_search_page(gemini_api: GeminiAPI):
     
     # Initialize knowledge base
     if 'knowledge_base' not in st.session_state or not isinstance(st.session_state.knowledge_base, KnowledgeBase):
-    kb = KnowledgeBase(gemini_api)
+        kb = KnowledgeBase(gemini_api)
 
     # Add sample documents
     sample_docs = [
