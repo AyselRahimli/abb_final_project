@@ -179,7 +179,7 @@ class GeminiAPI:
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=api_key)
-                self.model = genai.GenerativeModel('gemini-pro')
+                self.model = genai.GenerativeModel('gemini-flash')
             except Exception as e:
                 st.error(f"Gemini API initialization error: {str(e)}")
     
