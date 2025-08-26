@@ -668,27 +668,30 @@ class KnowledgeBase:
 
 def generate_sample_data():
     """Generate sample data for demo purposes"""
-    # Sample complaint data
+
+    # Fix text_az to have exactly 100 entries
+    base_texts = [
+        "Mobil tətbiqdə problem var, giriş edə bilmirəm",
+        "ATM-dən pul çıxarmaq mümkün olmur",
+        "Kart komissiyası çox yüksəkdir",
+        "Filial xidməti çox yavaşdır",
+        "Kredit məbləği kifayət etmir",
+        "İnternet banking işləmir"
+    ]
+    text_az = (base_texts * 17)[:100]  # 6 * 17 = 102 → truncate to 100
+
     complaint_data = {
         'id': list(range(1, 101)),
         'date': pd.date_range(start='2024-01-01', periods=100, freq='D'),
         'customer_id': np.random.randint(1000, 9999, 100),
         'channel': np.random.choice(['Mobil App', 'Filial', 'Call Center', 'Website'], 100),
         'category': np.random.choice(['Kart', 'ATM', 'Mobil', 'Komissiya', 'Filial', 'Kredit'], 100),
-        'text_az': [
-            "Mobil tətbiqdə problem var, giriş edə bilmirəm",
-            "ATM-dən pul çıxarmaq mümkün olmur",
-            "Kart komissiyası çox yüksəkdir",
-            "Filial xidməti çox yavaşdır",
-            "Kredit məbləği kifayət etmir",
-            "İnternet banking işləmir"
-        ] * 17,
+        'text_az': text_az,
         'severity': np.random.choice(['low', 'medium', 'high'], 100, p=[0.4, 0.4, 0.2]),
         'status': np.random.choice(['Open', 'In Progress', 'Closed'], 100, p=[0.2, 0.3, 0.5]),
         'region': np.random.choice(['Bakı', 'Gəncə', 'Sumqayıt', 'Mingəçevir', 'Şəki'], 100)
     }
 
-    # Sample loan/credit data
     loan_data = {
         'customer_id': list(range(1, 201)),
         'age': np.random.normal(40, 12, 200).astype(int),
@@ -703,7 +706,6 @@ def generate_sample_data():
         'region': np.random.choice(['Bakı', 'Gəncə', 'Sumqayıt', 'Mingəçevir', 'Şəki'], 200)
     }
 
-    # Sample customer data
     customer_data = {
         'customer_id': list(range(1, 301)),
         'age': np.random.normal(38, 15, 300).astype(int),
@@ -715,7 +717,12 @@ def generate_sample_data():
         'digital_adoption': np.random.choice(['High', 'Medium', 'Low'], 300, p=[0.3, 0.5, 0.2])
     }
 
-    return pd.DataFrame(complaint_data), pd.DataFrame(loan_data).head(100), pd.DataFrame(customer_data).head(100)
+    return (
+        pd.DataFrame(complaint_data),
+        pd.DataFrame(loan_data).head(100),
+        pd.DataFrame(customer_data).head(100)
+    )
+
 
 def create_pdf_report(data: Dict, title: str, language: str = 'az') -> bytes:
     """Generate PDF report"""
