@@ -189,24 +189,60 @@ class ImprovedGeminiAPI:
         return self._mock_response(prompt, language)
     
     def _mock_response(self, prompt: str, language: str = 'az') -> str:
-        """Təkmilləşdirilmiş mock cavab sistemi"""
+        """ABB Bank məlumatları ilə təkmilləşdirilmiş mock cavab sistemi"""
         prompt_lower = prompt.lower()
         
         # Şikayət cavabları
         if any(word in prompt_lower for word in ['complaint', 'şikayət', 'problem']):
-            return "Hörmətli müştəri, şikayətinizi qəbul edirik və dərhal araşdırmaya başlayırıq. 2-3 iş günü ərzində sizinlə əlaqə saxlayacağıq. Səbiriniz üçün təşəkkür edirik."
+            return """Hörmətli müştəri,
+
+ABB Bank olaraq şikayətinizi qəbul edirik və dərhal araşdırmaya başlayırıq. Bizim üçün müştəri məmnuniyyəti prioritetdir.
+
+Əlaqə məlumatlarımız:
+• Zəng Mərkəzi: 937
+• E-poçt: info@abb-bank.az
+• 24/7 online xidmət
+
+2-3 iş günü ərzində sizinlə əlaqə saxlayacağıq. Səbiriniz üçün təşəkkür edirik.
+
+Hörmətlə,
+ABB Bank Müştəri Xidmətləri"""
         
         # Kredit analiz cavabları
         elif any(word in prompt_lower for word in ['credit', 'kredit', 'loan', 'risk']):
-            return "Kredit analizi nəticəsində: müştərinin ödəmə qabiliyyəti orta səviyyədə qiymətləndirilir. Əlavə sənədlər və ya təminat tələb oluna bilər. Risk idarəetməsi departamenti ilə əlavə məsləhətləşmə tövsiyə olunur."
+            return """ABB Bank kredit analizi nəticəsində:
+
+Müştərinin ödəmə qabiliyyəti orta səviyyədə qiymətləndirilir. 
+
+Əlavə məlumatlar:
+• Zəng Mərkəzi: 937
+• E-poçt: info@abb-bank.az
+• Kredit departamenti ilə əlavə məsləhətləşmə tövsiyə olunur
+
+Risk idarəetməsi bölməsi ilə əlaqə saxlayın."""
         
         # Strategiya cavabları
         elif any(word in prompt_lower for word in ['strategy', 'strategiya', 'recommend', 'tövsiyə']):
-            return "Marketinq strategiyası tövsiyələri: 1) Rəqəmsal platformaları inkişaf etdirin, 2) Müştəri seqmentlərinə uyğun məhsullar təklif edin, 3) Müştəri məmnuniyyətini artırmaq üçün xidmət keyfiyyətini yaxşılaşdırın, 4) Çarpaz satış imkanlarından istifadə edin."
+            return """ABB Bank marketinq strategiyası tövsiyələri:
+
+1) Rəqəmsal platformaları inkişaf etdirin
+2) Müştəri seqmentlərinə uyğun məhsullar təklif edin  
+3) Müştəri məmnuniyyətini artırmaq üçün xidmət keyfiyyətini yaxşılaşdırın
+4) Çarpaz satış imkanlarından istifadə edin
+
+Əlavə məlumat üçün:
+• Zəng Mərkəzi: 937
+• E-poçt: info@abb-bank.az"""
         
         # Ümumi cavab
         else:
-            return "Sorğunuz əsasında analiz aparılmış və müvafiq tövsiyələr hazırlanmışdır. Əlavə məlumat üçün müvafiq departamentlə əlaqə saxlayın."
+            return """ABB Bank olaraq sorğunuz əsasında analiz aparılmış və müvafiq tövsiyələr hazırlanmışdır.
+
+Əlaqə məlumatlarımız:
+• Zəng Mərkəzi: 937  
+• E-poçt: info@abb-bank.az
+
+Əlavə məlumat üçün müvafiq departamentlə əlaqə saxlayın."""
 
 def validate_uploaded_file(uploaded_file) -> Optional[pd.DataFrame]:
     """Yüklənən faylları təhlükəsiz şəkildə yoxla və emal et"""
@@ -473,7 +509,12 @@ def home_page_improved(gemini_api):
     if st.button("Biznes Təhlilləri Yarad"):
         with st.spinner("Məlumatlar təhlil edilir və nəticələr yaradılır..."):
             insights_prompt = f"""
-            Bu bankın performans məlumatlarını təhlil edin və 3 əsas biznes nəticəsi verin:
+            ABB Bank-ın performans məlumatlarını təhlil edin və 3 əsas biznes nəticəsi verin:
+            
+            ABB Bank məlumatları:
+            - Bank adı: ABB Bank  
+            - Zəng Mərkəzi: 937
+            - E-poçt: info@abb-bank.az
             
             Məlumat Xülasəsi:
             - Ümumi şikayətlər: {len(complaint_df)}
@@ -481,7 +522,7 @@ def home_page_improved(gemini_api):
             - Orta risk səviyyəsi: {avg_pd:.1%}
             - Ən çox rastlanan şikayət kateqoriyası: {complaint_df['kateqoriya'].value_counts().index[0] if 'kateqoriya' in complaint_df.columns else 'N/A'}
             
-            Təkmilləşdirmə üçün əməli tövsiyələrə diqqət yetirin.
+            ABB Bank üçün təkmilləşdirmə tövsiyələrinə diqqət yetirin.
             """
             
             insights = gemini_api.generate_response(insights_prompt, st.session_state.language)
@@ -646,7 +687,16 @@ def complaints_page_improved(gemini_api):
                     with st.spinner("Cavab yaradılır..."):
                         try:
                             response = gemini_api.generate_response(
-                                f"Bu bank şikayətinə peşəkar cavab yaradın: {selected_complaint}",
+                                f"""ABB Bank olaraq bu müştəri şikayətinə peşəkar cavab yaradın. 
+                                
+                                Bank məlumatları:
+                                - Bank adı: ABB Bank
+                                - Zəng Mərkəzi: 937
+                                - E-poçt: info@abb-bank.az
+                                
+                                Şikayət: {selected_complaint}
+                                
+                                Cavab hörmətli, peşəkar və həlledicи olsun. Bank əlaqə məlumatlarını daxil edin.""",
                                 st.session_state.language
                             )
                             
@@ -766,7 +816,12 @@ def credit_risk_page_improved(gemini_api):
             st.subheader("Risk Qiymətləndirmə İzahı")
             with st.expander("Ətraflı Təhlili Göstər"):
                 explanation_prompt = f"""
-                Ətraflı kredit risk qiymətləndirmə izahı verin:
+                ABB Bank üçün ətraflı kredit risk qiymətləndirmə izahı verin:
+                
+                ABB Bank məlumatları:
+                - Bank adı: ABB Bank
+                - Zəng Mərkəzi: 937  
+                - E-poçt: info@abb-bank.az
                 
                 Müştəri Profili:
                 - Yaş: {age} il
@@ -779,12 +834,12 @@ def credit_risk_page_improved(gemini_api):
                 - Borc-Gəlir Nisbəti: {debt_to_income:.1%}
                 - Kredit-Təminat Nisbəti: {loan_to_value:.1%}
                 
-                Risk Metriklər:
+                Risk Metrikləri:
                 - PD: {pd_score:.2%}
                 - Gözlənilən İtki: {expected_loss:,.0f} AZN
                 - Risk Səviyyəsi: {risk_level}
                 
-                Əsas risk faktorlarını izah edin və tövsiyələr verin.
+                ABB Bank-ın risk idarəetmə siyasətini nəzərə alaraq əsas risk faktorlarını izah edin və tövsiyələr verin.
                 """
                 
                 try:
@@ -927,7 +982,12 @@ def product_insights_page_improved(gemini_api):
         if st.button("Strategiya Yarad", key="strategy_btn"):
             with st.spinner("Marketinq strategiyası yaradılır..."):
                 strategy_prompt = f"""
-                Müştəri seqmentlərinə əsaslanan marketinq strategiyası tövsiyələri yaradın:
+                ABB Bank üçün müştəri seqmentlərinə əsaslanan marketinq strategiyası tövsiyələri yaradın:
+                
+                ABB Bank məlumatları:
+                - Bank adı: ABB Bank
+                - Zəng Mərkəzi: 937
+                - E-poçt: info@abb-bank.az
                 
                 Seqment Paylanması:
                 {dict(customer_df['seqment'].value_counts())}
@@ -935,7 +995,7 @@ def product_insights_page_improved(gemini_api):
                 Seqmentlərə görə Orta Gəlir:
                 {customer_df.groupby('seqment')['gelir'].mean().to_dict()}
                 
-                Hər seqment üçün xüsusi məhsul tövsiyələri və marketinq yanaşmaları verin.
+                ABB Bank-ın mövcud xidmət portfelinə uyğun hər seqment üçün xüsusi məhsul tövsiyələri və marketinq yanaşmaları təqdim edin.
                 """
                 
                 try:
@@ -995,19 +1055,24 @@ def knowledge_search_page_improved(gemini_api):
     if 'kb_docs' not in st.session_state:
         st.session_state.kb_docs = [
             {
-                'title': 'Kredit Kartı Qaydaları',
-                'content': 'Kredit kartının istifadə qaydaları: Aylıq komissiya 2 AZN, nağd pul çıxarma 1.5%, minimum ödəniş 5%. 24/7 online idarəetmə. Cashback proqramı mövcuddur.',
+                'title': 'ABB Bank Kredit Kartı Qaydaları',
+                'content': 'ABB Bank kredit kartının istifadə qaydaları: Aylıq komissiya 2 AZN, nağd pul çıxarma 1.5%, minimum ödəniş 5%. 24/7 online idarəetmə. Cashback proqramı mövcuddur. Əlavə məlumat üçün: 937 və ya info@abb-bank.az',
                 'category': 'mehsullar'
             },
             {
-                'title': 'Mobil Banking Xidmətləri',
-                'content': 'Mobil tətbiq vasitəsilə: pul köçürmələri, hesab yoxlanması, kommunal ödənişlər, kredit ödənişləri. Biometrik giriş, push bildirişlər.',
+                'title': 'ABB Mobil Banking Xidmətləri',
+                'content': 'ABB mobil tətbiq vasitəsilə: pul köçürmələri, hesab yoxlanması, kommunal ödənişlər, kredit ödənişləri. Biometrik giriş, push bildirişlər. Texniki dəstək: 937, info@abb-bank.az',
                 'category': 'reqemsal'
             },
             {
-                'title': 'Kredit Şərtləri',
-                'content': 'Fərdi kreditlər: minimum gəlir 500 AZN, maksimum 50,000 AZN, müddət 60 aya qədər, faiz 12-18%. Zəmanət və ya girov tələb olunur.',
+                'title': 'ABB Bank Kredit Şərtləri',
+                'content': 'ABB Bank fərdi kreditlər: minimum gəlir 500 AZN, maksimum 50,000 AZN, müddət 60 aya qədər, faiz 12-18%. Zəmanət və ya girov tələb olunur. Məsləhət üçün: 937 və ya info@abb-bank.az',
                 'category': 'kreditler'
+            },
+            {
+                'title': 'ABB Bank Əlaqə Məlumatları',
+                'content': 'ABB Bank əlaqə məlumatları: Zəng Mərkəzi 937 (24/7), E-poçt info@abb-bank.az, Onlayn banking, mobil tətbiq. Şikayətlər və təkliflər üçün həmçinin yazılı müraciət edə bilərsiniz.',
+                'category': 'umumi'
             }
         ]
     
@@ -1067,12 +1132,17 @@ def knowledge_search_page_improved(gemini_api):
                     context = " ".join([doc['content'] for doc in relevant_docs[:2]])
                     
                     answer_prompt = f"""
-                    Bu məlumatlar əsasında suala cavab verin:
+                    ABB Bank bilik bazası əsasında bu suala cavab verin:
+                    
+                    ABB Bank məlumatları:
+                    - Bank adı: ABB Bank
+                    - Zəng Mərkəzi: 937
+                    - E-poçt: info@abb-bank.az
                     
                     Kontekst: {context}
                     Sual: {query}
                     
-                    Faydalı və dəqiq cavab verin.
+                    ABB Bank adından faydalı və dəqiq cavab verin. Cavabın sonunda əlaqə məlumatlarını qeyd edin.
                     """
                     
                     with st.spinner("Cavab yaradılır..."):
