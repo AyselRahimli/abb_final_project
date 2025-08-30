@@ -683,7 +683,7 @@ def complaints_page_improved(gemini_api):
                     key="response_complaint"
                 )
                 
-                if st.button("Peşəkar Cavab Yarad", key="generate_response_btn"):
+                if st.button("Peşəkar Cavab Yarat", key="generate_response_btn"):
                     with st.spinner("Cavab yaradılır..."):
                         try:
                             response = gemini_api.generate_response(
@@ -746,7 +746,7 @@ def complaints_page_improved(gemini_api):
 
 def credit_risk_page_improved(gemini_api):
     """Təkmilləşdirilmiş kredit risk səhifəsi"""
-    st.title("Kredit Riski və Gözlənilən İtkи Təhlili")
+    st.title("Kredit Riski və Gözlənilən İtki Təhlili")
     st.markdown("---")
     
     # Giriş bölməsi
@@ -979,7 +979,7 @@ def product_insights_page_improved(gemini_api):
         # Marketinq strategiyası
         st.subheader("Marketinq Strategiyası Tövsiyələri")
         
-        if st.button("Strategiya Yarad", key="strategy_btn"):
+        if st.button("Strategiya Yarat", key="strategy_btn"):
             with st.spinner("Marketinq strategiyası yaradılır..."):
                 strategy_prompt = f"""
                 ABB Bank üçün müştəri seqmentlərinə əsaslanan marketinq strategiyası tövsiyələri yaradın:
