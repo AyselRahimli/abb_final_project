@@ -1217,6 +1217,41 @@ def analyze_customer_segments(customer_df, segment_counts, gemini_api):
     except Exception as e:
         return f"Strategiya yaradılmasında xəta: {str(e)}"
 
+def generate_behavior_analysis(customer_df, income_col, age_col, gemini_api):
+    """Davranış analizi yarat"""
+    
+    # Təhlükəsiz statistik hesablamalar
+    try:
+        avg_income = customer_df[income_col].mean() if income_col else 0
+        avg_age = customer_df[age_col].mean() if age_col else 0
+        min_income = customer_df[income_col].min() if income_col else 0
+        max_income = customer_df[income_col].max() if income_col else 0
+    except Exception:
+        avg_income = avg_age = min_income = max_income = 0
+    
+    analysis_prompt = f"""
+    ABB Bank üçün müştəri davranış analizi yaradın:
+    
+    ABB Bank məlumatları:
+    - Bank adı: ABB Bank  
+    - Zəng Mərkəzi: 937
+    - E-poçt: info@abb-bank.az
+    
+    Məlumat Xülasəsi:
+    - Ümumi müştəri sayı: {len(customer_df)}
+    - Orta gəlir: {avg_income:.0f} AZN
+    - Orta yaş: {avg_age:.0f} il
+    - Gəlir diapazon: {min_income:.0f} - {max_income:.0f} AZN
+    
+    3 əsas davranış nümunəsi və marketinq tövsiyələri verin.
+    """
+    
+    try:
+        analysis = gemini_api.generate_response(analysis_prompt, st.session_state.language)
+        st.write(analysis)
+    except Exception as e:
+        st.error(f"Analiz yaradılmasında xəta: {str(e)}")
+
 def analyze_regional_data(customer_df, region_counts, avg_income_by_region, gemini_api):
     """Regional məlumatları AI ilə analiz et"""
     
@@ -1265,7 +1300,7 @@ def analyze_regional_data(customer_df, region_counts, avg_income_by_region, gemi
 def generate_comprehensive_product_strategy(customer_df, gemini_api):
     """Ümumi məhsul strategiyası yarat"""
     
-    # Əsas statistikaları topla
+    # Əsas statistikaları təhlükəsiz şəkildə topla
     age_col = find_column(customer_df, ['yas', 'age', 'yaş'])
     income_col = find_column(customer_df, ['gelir', 'income', 'gəlir'])
     tenure_col = find_column(customer_df, ['muddet_ay', 'tenure', 'müddət'])
@@ -1273,25 +1308,41 @@ def generate_comprehensive_product_strategy(customer_df, gemini_api):
     region_col = find_column(customer_df, ['region', 'şəhər', 'city'])
     digital_col = find_column(customer_df, ['reqemsal_qebul', 'digital_adoption'])
     
-    comprehensive_stats = {
-        'ümumi_müştəri': len(customer_df),
-        'orta_yaş': customer_df[age_col].mean() if age_col else 0,
-        'orta_gəlir': customer_df[income_col].mean() if income_col else 0,
-        'orta_məhsul_sayı': customer_df[product_col].mean() if product_col else 0,
-        'orta_müddət': customer_df[tenure_col].mean() if tenure_col else 0,
-    }
+    # Təhlükəsiz statistik hesablamalar
+    try:
+        comprehensive_stats = {
+            'ümumi_müştəri': len(customer_df),
+            'orta_yaş': customer_df[age_col].mean() if age_col else 0,
+            'orta_gəlir': customer_df[income_col].mean() if income_col else 0,
+            'orta_məhsul_sayı': customer_df[product_col].mean() if product_col else 0,
+            'orta_müddət': customer_df[tenure_col].mean() if tenure_col else 0,
+        }
+    except Exception:
+        comprehensive_stats = {
+            'ümumi_müştəri': len(customer_df),
+            'orta_yaş': 0,
+            'orta_gəlir': 0,
+            'orta_məhsul_sayı': 0,
+            'orta_müddət': 0,
+        }
     
     # Rəqəmsal qəbul analizi
     digital_analysis = ""
     if digital_col:
-        digital_dist = customer_df[digital_col].value_counts()
-        digital_analysis = f"Rəqəmsal Qəbul: {dict(digital_dist)}"
+        try:
+            digital_dist = customer_df[digital_col].value_counts()
+            digital_analysis = f"Rəqəmsal Qəbul: {dict(digital_dist)}"
+        except:
+            digital_analysis = "Rəqəmsal qəbul məlumatı mövcud deyil"
     
     # Regional paylanma
     regional_analysis = ""
     if region_col:
-        regional_dist = customer_df[region_col].value_counts()
-        regional_analysis = f"Regional Paylanma: {dict(regional_dist.head(3))}"
+        try:
+            regional_dist = customer_df[region_col].value_counts()
+            regional_analysis = f"Regional Paylanma: {dict(regional_dist.head(3))}"
+        except:
+            regional_analysis = "Regional məlumat mövcud deyil"
     
     strategy_prompt = f"""
     ABB Bank üçün hərtərəfli məhsul və çarpaz satış strategiyası yaradın:
@@ -1302,7 +1353,11 @@ def generate_comprehensive_product_strategy(customer_df, gemini_api):
     - E-poçt: info@abb-bank.az
     
     Mövcud Müştəri Bazası Analizi:
-    {comprehensive_stats}
+    - Ümumi müştəri sayı: {comprehensive_stats['ümumi_müştəri']}
+    - Orta yaş: {comprehensive_stats['orta_yaş']:.1f} il
+    - Orta gəlir: {comprehensive_stats['orta_gəlir']:.0f} AZN
+    - Orta məhsul sayı: {comprehensive_stats['orta_məhsul_sayı']:.1f}
+    - Orta əlaqə müddəti: {comprehensive_stats['orta_müddət']:.1f} ay
     
     {digital_analysis}
     {regional_analysis}
