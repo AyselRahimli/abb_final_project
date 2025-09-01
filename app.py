@@ -944,17 +944,27 @@ def product_insights_page_improved(gemini_api):
     
     try:
         if analysis_type == "Müştəri Seqmentasiyası":
-            perform_customer_segmentation(customer_df)
+            perform_customer_segmentation(customer_df, gemini_api)
         elif analysis_type == "Məhsul Meyil Analizi":
             perform_product_propensity_analysis(customer_df, gemini_api)
         elif analysis_type == "Regional Analiz":
-            perform_regional_analysis(customer_df)
+            perform_regional_analysis(customer_df, gemini_api)
         elif analysis_type == "Gəlir və Davranış Analizi":
             perform_income_behavior_analysis(customer_df, gemini_api)
     except Exception as e:
         st.error(f"Təhlildə xəta: {str(e)}")
+    
+    # Ümumi AI Strategiya Bölməsi
+    st.markdown("---")
+    st.subheader("🤖 AI tərəfindən Hərtərəfli Məhsul Strategiyası")
+    st.info("Yüklənən məlumatlara əsasən ABB Bank üçün ümumi strategiya tövsiyələri")
+    
+    if st.button("Hərtərəfli Strategiya Yarat", key="comprehensive_strategy", type="primary"):
+        with st.spinner("ABB Bank üçün hərtərəfli strategiya yaradılır..."):
+            comprehensive_strategy = generate_comprehensive_product_strategy(customer_df, gemini_api)
+            st.write(comprehensive_strategy)
 
-def perform_customer_segmentation(customer_df):
+def perform_customer_segmentation(customer_df, gemini_api):
     """Müştəri seqmentasiya təhlili"""
     st.subheader("Müştəri Seqmentasiyası")
     
@@ -1003,6 +1013,13 @@ def perform_customer_segmentation(customer_df):
                         title="Seqmentlərə görə Gəlir Paylanması")
             fig.update_layout(xaxis_tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
+    
+    # AI Seqment Strategiyası
+    st.markdown("---")
+    if st.button("Seqment Strategiyası Yarat", key="segment_strategy"):
+        with st.spinner("Seqment strategiyası yaradılır..."):
+            segment_analysis = analyze_customer_segments(customer_df, segment_counts, gemini_api)
+            st.write(segment_analysis)
 
 def perform_product_propensity_analysis(customer_df, gemini_api):
     """Məhsul meyil təhlili"""
@@ -1026,12 +1043,32 @@ def perform_product_propensity_analysis(customer_df, gemini_api):
             
             with col1:
                 st.write("**Müştəri Profili:**")
-                # Mövcud sütunları dinamik şəkildə göstər
-                display_columns = ['yas', 'gelir', 'muddet_ay', 'mehsul_sayi', 'region']
-                for col in display_columns:
-                    actual_col = find_column(customer_df, [col])
-                    if actual_col:
-                        st.write(f"{col.title()}: {customer_data[actual_col]}")
+                # Mövcud sütunları dinamik şəkildə göstər - daha etibarlı yolla
+                
+                # Yaş sütunu
+                age_col = find_column(customer_df, ['yas', 'age', 'yaş'])
+                if age_col and age_col in customer_data.index:
+                    st.write(f"Yaş: {customer_data[age_col]}")
+                
+                # Gəlir sütunu
+                income_col = find_column(customer_df, ['gelir', 'income', 'gəlir'])
+                if income_col and income_col in customer_data.index:
+                    st.write(f"Gəlir: {customer_data[income_col]}")
+                
+                # Müddət sütunu
+                tenure_col = find_column(customer_df, ['muddet_ay', 'tenure', 'müddət'])
+                if tenure_col and tenure_col in customer_data.index:
+                    st.write(f"Müddət (ay): {customer_data[tenure_col]}")
+                
+                # Məhsul sayı sütunu
+                product_col = find_column(customer_df, ['mehsul_sayi', 'products', 'məhsul_sayı'])
+                if product_col and product_col in customer_data.index:
+                    st.write(f"Məhsul sayı: {customer_data[product_col]}")
+                
+                # Region sütunu
+                region_col = find_column(customer_df, ['region', 'şəhər', 'city'])
+                if region_col and region_col in customer_data.index:
+                    st.write(f"Region: {customer_data[region_col]}")
             
             with col2:
                 # Məhsul meyillərini hesabla
@@ -1061,7 +1098,7 @@ def perform_product_propensity_analysis(customer_df, gemini_api):
                 if st.button("AI Məhsul Tövsiyələri", key="ai_product_rec"):
                     generate_product_recommendations(customer_data, gemini_api)
 
-def perform_regional_analysis(customer_df):
+def perform_regional_analysis(customer_df, gemini_api):
     """Regional təhlil"""
     st.subheader("Regional Analiz")
     
@@ -1083,6 +1120,13 @@ def perform_regional_analysis(customer_df):
                 fig = px.bar(x=avg_income_by_region.values, y=avg_income_by_region.index,
                            orientation='h', title="Regiona görə Orta Gəlir")
                 st.plotly_chart(fig, use_container_width=True)
+        
+        # Regional Strategiya
+        st.markdown("---")
+        if st.button("Regional Strategiya Yarat", key="regional_strategy"):
+            with st.spinner("Regional strategiya yaradılır..."):
+                regional_analysis = analyze_regional_data(customer_df, region_counts, avg_income_by_region if income_col else None, gemini_api)
+                st.write(regional_analysis)
     else:
         st.warning("Regional analiz üçün 'region' sütunu tapılmadı.")
 
@@ -1094,10 +1138,9 @@ def perform_income_behavior_analysis(customer_df, gemini_api):
     age_col = find_column(customer_df, ['yas', 'age', 'yaş'])
     
     if income_col and age_col:
-        # Yaş və gəlir əlaqəsi
+        # Yaş və gəlir əlaqəsi - statsmodels olmadan sadə scatter plot
         fig = px.scatter(customer_df, x=age_col, y=income_col,
-                        title="Yaş və Gəlir Əlaqəsi",
-                        trendline="ols")
+                        title="Yaş və Gəlir Əlaqəsi")
         st.plotly_chart(fig, use_container_width=True)
         
         # Gəlir seqmentləri
@@ -1123,6 +1166,179 @@ def perform_income_behavior_analysis(customer_df, gemini_api):
         # AI analiz tövsiyələri
         if st.button("Davranış Analizi Yarat", key="behavior_analysis"):
             generate_behavior_analysis(customer_df, income_col, age_col, gemini_api)
+    else:
+        st.warning("Gəlir və yaş sütunları tapılmadı. Bu analiz üçün 'gelir' və 'yaş' sütunları tələb olunur.")
+
+def analyze_customer_segments(customer_df, segment_counts, gemini_api):
+    """Müştəri seqmentlərini AI ilə analiz et"""
+    
+    # Seqment statistikalarını hazırla
+    age_col = find_column(customer_df, ['yas', 'age', 'yaş'])
+    income_col = find_column(customer_df, ['gelir', 'income', 'gəlir'])
+    product_col = find_column(customer_df, ['mehsul_sayi', 'products', 'məhsul_sayı'])
+    
+    segment_stats = {}
+    if 'seqment' in customer_df.columns:
+        for segment in segment_counts.index:
+            segment_data = customer_df[customer_df['seqment'] == segment]
+            segment_stats[segment] = {
+                'sayı': len(segment_data),
+                'orta_yaş': segment_data[age_col].mean() if age_col else 0,
+                'orta_gəlir': segment_data[income_col].mean() if income_col else 0,
+                'orta_məhsul': segment_data[product_col].mean() if product_col else 0
+            }
+    
+    strategy_prompt = f"""
+    ABB Bank üçün müştəri seqment analizi və strategiya tövsiyələri:
+    
+    ABB Bank məlumatları:
+    - Bank adı: ABB Bank
+    - Zəng Mərkəzi: 937
+    - E-poçt: info@abb-bank.az
+    
+    Seqment Təhlili:
+    {segment_stats}
+    
+    Ümumi məlumat:
+    - Ümumi müştəri sayı: {len(customer_df)}
+    - Ən böyük seqment: {segment_counts.index[0]} ({segment_counts.iloc[0]} müştəri)
+    
+    Hər seqment üçün:
+    1. Xüsusi məhsul tövsiyələri
+    2. Marketinq strategiyası
+    3. Çarpaz satış imkanları
+    4. Risk və potensial qiymətləndirmə
+    
+    ABB Bank-ın məhsul portfelinə uyğun təklif edin.
+    """
+    
+    try:
+        return gemini_api.generate_response(strategy_prompt, st.session_state.language)
+    except Exception as e:
+        return f"Strategiya yaradılmasında xəta: {str(e)}"
+
+def analyze_regional_data(customer_df, region_counts, avg_income_by_region, gemini_api):
+    """Regional məlumatları AI ilə analiz et"""
+    
+    # Regional statistikaları hazırla
+    regional_stats = {}
+    region_col = find_column(customer_df, ['region', 'şəhər', 'city'])
+    
+    if region_col:
+        for region in region_counts.index:
+            region_data = customer_df[customer_df[region_col] == region]
+            regional_stats[region] = {
+                'müştəri_sayı': len(region_data),
+                'orta_gəlir': avg_income_by_region.get(region, 0) if avg_income_by_region is not None else 0,
+                'payı': f"{len(region_data)/len(customer_df)*100:.1f}%"
+            }
+    
+    regional_prompt = f"""
+    ABB Bank üçün regional analiz və inkişaf strategiyası:
+    
+    ABB Bank məlumatları:
+    - Bank adı: ABB Bank
+    - Zəng Mərkəzi: 937
+    - E-poçt: info@abb-bank.az
+    
+    Regional Təhlil:
+    {regional_stats}
+    
+    Ən çox müştəri: {region_counts.index[0]} ({region_counts.iloc[0]} müştəri)
+    {f"Ən yüksək gəlir: {avg_income_by_region.index[-1]} ({avg_income_by_region.iloc[-1]:.0f} AZN)" if avg_income_by_region is not None else ""}
+    
+    Hər region üçün:
+    1. Bazar potensialı qiymətləndirmə
+    2. Xüsusi məhsul strategiyası
+    3. Filial və xidmət tövsiyələri
+    4. Rəqabət mövqeyi
+    5. Böyümə imkanları
+    
+    ABB Bank-ın regional inkişaf planını təqdim edin.
+    """
+    
+    try:
+        return gemini_api.generate_response(regional_prompt, st.session_state.language)
+    except Exception as e:
+        return f"Regional analiz yaradılmasında xəta: {str(e)}"
+
+def generate_comprehensive_product_strategy(customer_df, gemini_api):
+    """Ümumi məhsul strategiyası yarat"""
+    
+    # Əsas statistikaları topla
+    age_col = find_column(customer_df, ['yas', 'age', 'yaş'])
+    income_col = find_column(customer_df, ['gelir', 'income', 'gəlir'])
+    tenure_col = find_column(customer_df, ['muddet_ay', 'tenure', 'müddət'])
+    product_col = find_column(customer_df, ['mehsul_sayi', 'products', 'məhsul_sayı'])
+    region_col = find_column(customer_df, ['region', 'şəhər', 'city'])
+    digital_col = find_column(customer_df, ['reqemsal_qebul', 'digital_adoption'])
+    
+    comprehensive_stats = {
+        'ümumi_müştəri': len(customer_df),
+        'orta_yaş': customer_df[age_col].mean() if age_col else 0,
+        'orta_gəlir': customer_df[income_col].mean() if income_col else 0,
+        'orta_məhsul_sayı': customer_df[product_col].mean() if product_col else 0,
+        'orta_müddət': customer_df[tenure_col].mean() if tenure_col else 0,
+    }
+    
+    # Rəqəmsal qəbul analizi
+    digital_analysis = ""
+    if digital_col:
+        digital_dist = customer_df[digital_col].value_counts()
+        digital_analysis = f"Rəqəmsal Qəbul: {dict(digital_dist)}"
+    
+    # Regional paylanma
+    regional_analysis = ""
+    if region_col:
+        regional_dist = customer_df[region_col].value_counts()
+        regional_analysis = f"Regional Paylanma: {dict(regional_dist.head(3))}"
+    
+    strategy_prompt = f"""
+    ABB Bank üçün hərtərəfli məhsul və çarpaz satış strategiyası yaradın:
+    
+    ABB Bank məlumatları:
+    - Bank adı: ABB Bank
+    - Zəng Mərkəzi: 937
+    - E-poçt: info@abb-bank.az
+    
+    Mövcud Müştəri Bazası Analizi:
+    {comprehensive_stats}
+    
+    {digital_analysis}
+    {regional_analysis}
+    
+    Zəhmət olmasa aşağıdakları təqdim edin:
+    
+    1. **Məhsul Portfel Strategiyası**:
+       - Hansı məhsulları prioritet etməli
+       - Yeni məhsul imkanları
+       - Cross-selling strategiyaları
+    
+    2. **Müştəri Seqment Tövsiyələri**:
+       - Hər seqment üçün uyğun məhsullar
+       - Targeting strategiyaları
+       - Retention tədbirləri
+    
+    3. **Rəqəmsal Transformasiya**:
+       - Mobil banking təkmilləşdirmə
+       - AI və personallaşdırma
+       - Customer journey optimizasiyası
+    
+    4. **Regional İnkişaf Planı**:
+       - Bölgələrə görə fərqlənən yanaşmalar
+       - Filial şəbəkəsi strategiyası
+    
+    5. **Performans Göstəriciləri (KPI)**:
+       - Hansı metriklər izlənməli
+       - Uğur kriteriyaları
+    
+    ABB Bank-ın mövcud xidmət portfeli və Azərbaycan bank bazarını nəzərə alın.
+    """
+    
+    try:
+        return gemini_api.generate_response(strategy_prompt, st.session_state.language)
+    except Exception as e:
+        return f"Strategiya yaradılmasında xəta: {str(e)}"
 
 def find_column(df, possible_names):
     """Müxtəlif adlarla sütun tap"""
