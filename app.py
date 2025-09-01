@@ -89,7 +89,7 @@ def generate_sample_data_fixed():
         "Kredit məbləği kifayət etmir",
         "İnternet banking işləmir",
         "Hesabımdan səhv məbləğ silinib",
-        "Telefon zəngləri çox tez-tez gəlir",
+        "Telefon zənglər çox tez-tez gəlir",
         "Online ödəniş sistemi yavaş işləyir",
         "Kart bloklanıb, səbəbi aydın deyil"
     ]
@@ -502,9 +502,9 @@ def home_page_improved(gemini_api):
         except Exception as e:
             st.error(f"Tendensiya qrafikinin yaradılmasında xəta: {str(e)}")
     
-    # AI İntelektual təhlil bölməsi
+    # AI İntellektual təhlil bölməsi
     st.markdown("---")
-    st.subheader("🤖 AI tərəfindən yaradılan təhlillər")
+    st.subheader("🤖 AI tərəfindən yaradılan təhillər")
     
     if st.button("Biznes Təhlilləri Yarad"):
         with st.spinner("Məlumatlar təhlil edilir və nəticələr yaradılır..."):
@@ -696,7 +696,7 @@ def complaints_page_improved(gemini_api):
                                 
                                 Şikayət: {selected_complaint}
                                 
-                                Cavab hörmətli, peşəkar və həlledicи olsun. Bank əlaqə məlumatlarını daxil edin.""",
+                                Cavab hörmətli, peşəkar və həlledici olsun. Bank əlaqə məlumatlarını daxil edin.""",
                                 st.session_state.language
                             )
                             
@@ -771,7 +771,7 @@ def credit_risk_page_improved(gemini_api):
         loan_to_value = st.slider("Kredit-Təminat Nisbəti", 0.0, 1.0, 0.8, key="risk_ltv")
     
     # Risk hesablama düyməsi
-    if st.button("Risk Metrikləri Hesabla", key="calc_risk_btn"):
+    if st.button("Risk Metriklər Hesabla", key="calc_risk_btn"):
         try:
             # Sadələşdirilmiş model istifadə edərək PD hesabla
             pd_score = calculate_pd_simple(age, income, employment, credit_score, debt_to_income, loan_to_value)
@@ -834,7 +834,7 @@ def credit_risk_page_improved(gemini_api):
                 - Borc-Gəlir Nisbəti: {debt_to_income:.1%}
                 - Kredit-Təminat Nisbəti: {loan_to_value:.1%}
                 
-                Risk Metrikləri:
+                Risk Metriklər:
                 - PD: {pd_score:.2%}
                 - Gözlənilən İtki: {expected_loss:,.0f} AZN
                 - Risk Səviyyəsi: {risk_level}
@@ -887,79 +887,160 @@ def product_insights_page_improved(gemini_api):
     st.title("Məhsul Təhlilləri və Çarpaz Satış Analizi")
     st.markdown("---")
     
+    # Fayl yükləmə bölməsi
+    st.subheader("Məlumat Yükləyin")
+    uploaded_file = st.file_uploader(
+        "Müştəri məlumatları faylını seçin (CSV, Excel, JSON)",
+        type=['csv', 'xlsx', 'json'],
+        help="Müştəri məlumatlarını təhlil üçün yükləyin. Gözlənilən sütunlar: müştəri_id, yaş, gəlir, məhsul_sayı, region, vb."
+    )
+    
+    # Məlumatları yüklə və emal et
+    if uploaded_file is not None:
+        customer_df = validate_uploaded_file(uploaded_file)
+        if customer_df is not None:
+            st.session_state.customer_data = customer_df
+            st.success(f"Fayl uğurla yükləndi! {len(customer_df)} müştəri məlumatı emal ediləcək.")
+        else:
+            st.error("Fayl emal edilə bilmədi. Zəhmət olmasa düzgün format yoxlayın.")
+            return
+    else:
+        # Nümunə məlumatlar istifadə et
+        try:
+            _, _, customer_df = generate_sample_data_fixed()
+            st.session_state.customer_data = customer_df
+            st.info("Nümunə məlumatlar istifadə edilir. Həqiqi təhlil üçün öz faylınızı yükləyin.")
+        except Exception as e:
+            st.error(f"Nümunə məlumatların yüklənməsində xəta: {str(e)}")
+            return
+    
+    customer_df = st.session_state.customer_data
+    
+    if customer_df is None or customer_df.empty:
+        st.warning("Məlumat yoxdur. Zəhmət olmasa düzgün fayl yükləyin.")
+        return
+    
+    # Məlumat keyfiyyəti yoxlanması
+    st.subheader("Məlumat Keyfiyyəti")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Ümumi Qeydlər", len(customer_df))
+    with col2:
+        missing_pct = (customer_df.isnull().sum().sum() / (len(customer_df) * len(customer_df.columns))) * 100
+        st.metric("Çatışmayan Məlumat", f"{missing_pct:.1f}%")
+    with col3:
+        numeric_cols = customer_df.select_dtypes(include=[np.number]).columns
+        st.metric("Rəqəmsal Sütunlar", len(numeric_cols))
+    with col4:
+        duplicates = customer_df.duplicated().sum()
+        st.metric("Təkrar Qeydlər", duplicates)
+    
+    # Əsas təhlil seçimi
+    analysis_type = st.selectbox(
+        "Təhlil növünü seçin:",
+        ["Müştəri Seqmentasiyası", "Məhsul Meyil Analizi", "Regional Analiz", "Gəlir və Davranış Analizi"]
+    )
+    
     try:
-        # Nümunə məlumatları yüklə
-        _, _, customer_df = generate_sample_data_fixed()
+        if analysis_type == "Müştəri Seqmentasiyası":
+            perform_customer_segmentation(customer_df)
+        elif analysis_type == "Məhsul Meyil Analizi":
+            perform_product_propensity_analysis(customer_df, gemini_api)
+        elif analysis_type == "Regional Analiz":
+            perform_regional_analysis(customer_df)
+        elif analysis_type == "Gəlir və Davranış Analizi":
+            perform_income_behavior_analysis(customer_df, gemini_api)
+    except Exception as e:
+        st.error(f"Təhlildə xəta: {str(e)}")
+
+def perform_customer_segmentation(customer_df):
+    """Müştəri seqmentasiya təhlili"""
+    st.subheader("Müştəri Seqmentasiyası")
+    
+    # Mövcud sütunları yoxla və uyğunlaş
+    age_col = find_column(customer_df, ['yas', 'age', 'yaş'])
+    income_col = find_column(customer_df, ['gelir', 'income', 'gəlir'])
+    tenure_col = find_column(customer_df, ['muddet_ay', 'tenure', 'müddət'])
+    
+    if not all([age_col, income_col]):
+        st.error("Seqmentasiya üçün 'yaş' və 'gəlir' sütunları tələb olunur.")
+        return
+    
+    # Seqment təyin etmə funksiyası
+    def assign_segment(row):
+        age = row[age_col] if age_col else 35
+        income = row[income_col] if income_col else 1000
+        tenure = row[tenure_col] if tenure_col else 12
         
-        # Müştəri seqmentasiyası
-        st.subheader("Müştəri Seqmentasiyası")
-        
-        # Müştəri məlumatlarına seqmentlər əlavə et
-        def assign_segment(row):
-            age, income, tenure = row['yas'], row['gelir'], row['muddet_ay']
-            
-            if 25 <= age <= 35 and income >= 1200 and tenure <= 24:
-                return 'Gənc Peşəkar'
-            elif 35 <= age <= 50 and income >= 1800:
-                return 'Sabit'
-            elif income >= 3000:
-                return 'Premium'
-            elif age >= 55:
-                return 'Yaşlı'
-            elif age <= 25:
-                return 'Tələbə/Başlanğıc'
-            else:
-                return 'Kütləvi Bazar'
-        
-        customer_df['seqment'] = customer_df.apply(assign_segment, axis=1)
-        
-        # Seqmentləri göstər
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            segment_counts = customer_df['seqment'].value_counts()
-            fig = px.pie(values=segment_counts.values, names=segment_counts.index, 
-                        title="Müştəri Seqmentləri")
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            # Seqmentlərə görə gəlir paylanması
-            fig = px.box(customer_df, x='seqment', y='gelir', 
+        if 25 <= age <= 35 and income >= 1200:
+            return 'Gənc Peşəkar'
+        elif 35 <= age <= 50 and income >= 1800:
+            return 'Sabit'
+        elif income >= 3000:
+            return 'Premium'
+        elif age >= 55:
+            return 'Yaşlı'
+        elif age <= 25:
+            return 'Tələbə/Başlanğıc'
+        else:
+            return 'Kütləvi Bazar'
+    
+    customer_df['seqment'] = customer_df.apply(assign_segment, axis=1)
+    
+    # Vizuallaşdırma
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        segment_counts = customer_df['seqment'].value_counts()
+        fig = px.pie(values=segment_counts.values, names=segment_counts.index, 
+                    title="Müştəri Seqmentləri")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        if income_col:
+            fig = px.box(customer_df, x='seqment', y=income_col, 
                         title="Seqmentlərə görə Gəlir Paylanması")
-            # Plotly 'update_xaxis' metodunu düzgün istifadə edirik
             fig.update_layout(xaxis_tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
-        
-        # Çarpaz satış təhlili
-        st.subheader("Çarpaz Satış İmkanları")
-        
+
+def perform_product_propensity_analysis(customer_df, gemini_api):
+    """Məhsul meyil təhlili"""
+    st.subheader("Məhsul Meyil Analizi")
+    
+    # Müştəri seç
+    customer_id_col = find_column(customer_df, ['musteri_id', 'customer_id', 'id'])
+    
+    if customer_id_col:
+        customer_ids = customer_df[customer_id_col].head(20).tolist()
         selected_customer_id = st.selectbox(
             "Təhlil üçün Müştəri Seçin:",
-            customer_df['musteri_id'].head(20).tolist(),
+            customer_ids,
             key="product_customer_select"
         )
         
         if selected_customer_id:
-            customer_data = customer_df[customer_df['musteri_id'] == selected_customer_id].iloc[0]
+            customer_data = customer_df[customer_df[customer_id_col] == selected_customer_id].iloc[0]
             
             col1, col2 = st.columns([1, 2])
             
             with col1:
                 st.write("**Müştəri Profili:**")
-                st.write(f"Yaş: {customer_data['yas']}")
-                st.write(f"Gəlir: {customer_data['gelir']:,.0f} AZN")
-                st.write(f"Seqment: {customer_data['seqment']}")
-                st.write(f"Müddət: {customer_data['muddet_ay']} ay")
-                st.write(f"Cari Məhsullar: {customer_data['mehsul_sayi']}")
+                # Mövcud sütunları dinamik şəkildə göstər
+                display_columns = ['yas', 'gelir', 'muddet_ay', 'mehsul_sayi', 'region']
+                for col in display_columns:
+                    actual_col = find_column(customer_df, [col])
+                    if actual_col:
+                        st.write(f"{col.title()}: {customer_data[actual_col]}")
             
             with col2:
-                # Məhsul meyillərini hesabla (sadələşdirilmiş)
+                # Məhsul meyillərini hesabla
                 products = {
-                    'Kredit Kartı': calculate_product_propensity(customer_data, 'kredit_kart'),
-                    'Şəxsi Kredit': calculate_product_propensity(customer_data, 'sexsi_kredit'),
-                    'Mortgage': calculate_product_propensity(customer_data, 'mortgage'),
-                    'İnvestisiya Hesabı': calculate_product_propensity(customer_data, 'investisiya'),
-                    'Sığorta': calculate_product_propensity(customer_data, 'sigorta')
+                    'Kredit Kartı': calculate_product_propensity_from_data(customer_data, customer_df, 'kredit_kart'),
+                    'Şəxsi Kredit': calculate_product_propensity_from_data(customer_data, customer_df, 'sexsi_kredit'),
+                    'Mortgage': calculate_product_propensity_from_data(customer_data, customer_df, 'mortgage'),
+                    'İnvestisiya Hesabı': calculate_product_propensity_from_data(customer_data, customer_df, 'investisiya'),
+                    'Sığorta': calculate_product_propensity_from_data(customer_data, customer_df, 'sigorta')
                 }
                 
                 prop_df = pd.DataFrame(list(products.items()), columns=['Məhsul', 'Meyil'])
@@ -975,43 +1056,90 @@ def product_insights_page_improved(gemini_api):
                 top_3 = prop_df.tail(3)
                 for _, row in top_3.iterrows():
                     st.write(f"• {row['Məhsul']}: {row['Meyil']:.1%} ehtimal")
-        
-        # Marketinq strategiyası
-        st.subheader("Marketinq Strategiyası Tövsiyələri")
-        
-        if st.button("Strategiya Yarat", key="strategy_btn"):
-            with st.spinner("Marketinq strategiyası yaradılır..."):
-                strategy_prompt = f"""
-                ABB Bank üçün müştəri seqmentlərinə əsaslanan marketinq strategiyası tövsiyələri yaradın:
-                
-                ABB Bank məlumatları:
-                - Bank adı: ABB Bank
-                - Zəng Mərkəzi: 937
-                - E-poçt: info@abb-bank.az
-                
-                Seqment Paylanması:
-                {dict(customer_df['seqment'].value_counts())}
-                
-                Seqmentlərə görə Orta Gəlir:
-                {customer_df.groupby('seqment')['gelir'].mean().to_dict()}
-                
-                ABB Bank-ın mövcud xidmət portfelinə uyğun hər seqment üçün xüsusi məhsul tövsiyələri və marketinq yanaşmaları təqdim edin.
-                """
-                
-                try:
-                    strategy = gemini_api.generate_response(strategy_prompt, st.session_state.language)
-                    st.write(strategy)
-                except Exception as e:
-                    st.error(f"Strategiya yaradılmasında xəta: {str(e)}")
-    
-    except Exception as e:
-        st.error(f"Məhsul təhlilləri səhifəsində xəta: {str(e)}")
+                    
+                # AI tövsiyələri
+                if st.button("AI Məhsul Tövsiyələri", key="ai_product_rec"):
+                    generate_product_recommendations(customer_data, gemini_api)
 
-def calculate_product_propensity(customer_data, product):
-    """Məhsul meyil balını hesabla"""
-    age = customer_data['yas']
-    income = customer_data['gelir']
-    segment = customer_data['seqment']
+def perform_regional_analysis(customer_df):
+    """Regional təhlil"""
+    st.subheader("Regional Analiz")
+    
+    region_col = find_column(customer_df, ['region', 'şəhər', 'city'])
+    income_col = find_column(customer_df, ['gelir', 'income', 'gəlir'])
+    
+    if region_col:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            region_counts = customer_df[region_col].value_counts()
+            fig = px.pie(values=region_counts.values, names=region_counts.index,
+                        title="Regional Paylanma")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            if income_col:
+                avg_income_by_region = customer_df.groupby(region_col)[income_col].mean().sort_values(ascending=True)
+                fig = px.bar(x=avg_income_by_region.values, y=avg_income_by_region.index,
+                           orientation='h', title="Regiona görə Orta Gəlir")
+                st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Regional analiz üçün 'region' sütunu tapılmadı.")
+
+def perform_income_behavior_analysis(customer_df, gemini_api):
+    """Gəlir və davranış analizi"""
+    st.subheader("Gəlir və Davranış Analizi")
+    
+    income_col = find_column(customer_df, ['gelir', 'income', 'gəlir'])
+    age_col = find_column(customer_df, ['yas', 'age', 'yaş'])
+    
+    if income_col and age_col:
+        # Yaş və gəlir əlaqəsi
+        fig = px.scatter(customer_df, x=age_col, y=income_col,
+                        title="Yaş və Gəlir Əlaqəsi",
+                        trendline="ols")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Gəlir seqmentləri
+        customer_df['gelir_seqment'] = pd.cut(customer_df[income_col], 
+                                              bins=3, labels=['Aşağı', 'Orta', 'Yüksək'])
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            income_seg_counts = customer_df['gelir_seqment'].value_counts()
+            fig = px.bar(x=income_seg_counts.index, y=income_seg_counts.values,
+                        title="Gəlir Seqmentləri")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # Məhsul sayı və gəlir əlaqəsi
+            product_col = find_column(customer_df, ['mehsul_sayi', 'products'])
+            if product_col:
+                fig = px.box(customer_df, x='gelir_seqment', y=product_col,
+                           title="Gəlir Seqmentinə görə Məhsul Sayı")
+                st.plotly_chart(fig, use_container_width=True)
+        
+        # AI analiz tövsiyələri
+        if st.button("Davranış Analizi Yarat", key="behavior_analysis"):
+            generate_behavior_analysis(customer_df, income_col, age_col, gemini_api)
+
+def find_column(df, possible_names):
+    """Müxtəlif adlarla sütun tap"""
+    for name in possible_names:
+        if name in df.columns:
+            return name
+        # Case-insensitive axtarış
+        for col in df.columns:
+            if col.lower() == name.lower():
+                return col
+    return None
+
+def calculate_product_propensity_from_data(customer_data, customer_df, product):
+    """Həqiqi məlumatlardan məhsul meyili hesabla"""
+    age_col = find_column(customer_df, ['yas', 'age', 'yaş'])
+    income_col = find_column(customer_df, ['gelir', 'income', 'gəlir'])
+    
     
     base_scores = {
         'kredit_kart': 0.4,
@@ -1037,14 +1165,53 @@ def calculate_product_propensity(customer_data, product):
     elif income >= 1500:
         score += 0.05
     
-    # Seqment düzəlişləri
-    if segment == 'Premium':
-        score += 0.15
-    elif segment == 'Gənc Peşəkar':
-        if product in ['kredit_kart', 'sexsi_kredit']:
-            score += 0.1
-    
     return min(0.95, score)
+
+def generate_product_recommendations(customer_data, gemini_api):
+    """AI məhsul tövsiyələri yarat"""
+    rec_prompt = f"""
+    ABB Bank üçün bu müştəri profilinə əsasən məhsul tövsiyələri yaradın:
+    
+    ABB Bank məlumatları:
+    - Bank adı: ABB Bank
+    - Zəng Mərkəzi: 937
+    - E-poçt: info@abb-bank.az
+    
+    Müştəri Profili: {customer_data.to_dict()}
+    
+    3 ən uyğun məhsul tövsiyəsi verin və hər birini izah edin.
+    """
+    
+    try:
+        recommendations = gemini_api.generate_response(rec_prompt, st.session_state.language)
+        st.write(recommendations)
+    except Exception as e:
+        st.error(f"Tövsiyələr yaradılmasında xəta: {str(e)}")
+
+def generate_behavior_analysis(customer_df, income_col, age_col, gemini_api):
+    """Davranış analizi yarat"""
+    analysis_prompt = f"""
+    ABB Bank üçün müştəri davranış analizi yaradın:
+    
+    ABB Bank məlumatları:
+    - Bank adı: ABB Bank  
+    - Zəng Mərkəzi: 937
+    - E-poçt: info@abb-bank.az
+    
+    Məlumat Xülasəsi:
+    - Ümumi müştəri sayı: {len(customer_df)}
+    - Orta gəlir: {customer_df[income_col].mean():.0f} AZN
+    - Orta yaş: {customer_df[age_col].mean():.0f} il
+    - Gəlir diapazon: {customer_df[income_col].min():.0f} - {customer_df[income_col].max():.0f} AZN
+    
+    3 əsas davranış nümunəsi və marketinq tövsiyələri verin.
+    """
+    
+    try:
+        analysis = gemini_api.generate_response(analysis_prompt, st.session_state.language)
+        st.write(analysis)
+    except Exception as e:
+        st.error(f"Analiz yaradılmasında xəta: {str(e)}")
 
 def knowledge_search_page_improved(gemini_api):
     """Təkmilləşdirilmiş bilik axtarış səhifəsi"""
@@ -1055,8 +1222,8 @@ def knowledge_search_page_improved(gemini_api):
     if 'kb_docs' not in st.session_state:
         st.session_state.kb_docs = [
             {
-                'title': 'ABB Bank Kredit Kartı Qaydaları',
-                'content': 'ABB Bank kredit kartının istifadə qaydaları: Aylıq komissiya 2 AZN, nağd pul çıxarma 1.5%, minimum ödəniş 5%. 24/7 online idarəetmə. Cashback proqramı mövcuddur. Əlavə məlumat üçün: 937 və ya info@abb-bank.az',
+                'title': 'ABB Bank Kredit Kartı Qaydalari',
+                'content': 'ABB Bank kredit kartının istifadə qaydalari: Aylıq komissiya 2 AZN, nağd pul çıxarma 1.5%, minimum ödəniş 5%. 24/7 online idarəetmə. Cashback proqramı mövcuddur. Əlavə məlumat üçün: 937 və ya info@abb-bank.az',
                 'category': 'mehsullar'
             },
             {
