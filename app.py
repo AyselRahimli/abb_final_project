@@ -1385,6 +1385,17 @@ def calculate_product_propensity_from_data(customer_data, customer_df, product):
 
 def generate_product_recommendations(customer_data, gemini_api):
     """AI məhsul tövsiyələri yarat"""
+    
+    # Təhlükəsiz şəkildə müştəri məlumatlarını hazırla
+    safe_customer_data = {}
+    
+    # Bütün mövcud məlumatları təhlükəsiz şəkildə əlavə et
+    for key, value in customer_data.items():
+        try:
+            safe_customer_data[key] = str(value)
+        except:
+            safe_customer_data[key] = "N/A"
+    
     rec_prompt = f"""
     ABB Bank üçün bu müştəri profilinə əsasən məhsul tövsiyələri yaradın:
     
@@ -1393,9 +1404,16 @@ def generate_product_recommendations(customer_data, gemini_api):
     - Zəng Mərkəzi: 937
     - E-poçt: info@abb-bank.az
     
-    Müştəri Profili: {customer_data.to_dict()}
+    Müştəri Profili:
+    - Müştəri ID: {safe_customer_data.get('musteri_id', 'N/A')}
+    - Yaş: {safe_customer_data.get('yas', 'N/A')} il
+    - Gəlir: {safe_customer_data.get('gelir', 'N/A')} AZN
+    - Müddət: {safe_customer_data.get('muddet_ay', 'N/A')} ay
+    - Cari məhsul sayı: {safe_customer_data.get('mehsul_sayi', 'N/A')}
+    - Region: {safe_customer_data.get('region', 'N/A')}
+    - Rəqəmsal qəbul: {safe_customer_data.get('reqemsal_qebul', 'N/A')}
     
-    3 ən uyğun məhsul tövsiyəsi verin və hər birini izah edin.
+    3 ən uyğun məhsul tövsiyəsi verin və hər birini izah edin. ABB Bank-ın xidmət portfelinə uyğun tövsiyələr təqdim edin.
     """
     
     try:
