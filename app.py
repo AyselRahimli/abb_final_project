@@ -1,4 +1,4 @@
-# Bank360 - Səliqəli və Xətasız Versiya
+# Bank360 - 4 Səhifəli Versiya
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -11,12 +11,28 @@ warnings.filterwarnings('ignore')
 
 # Təhlükəsiz import-lar
 try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.cluster import KMeans
+    from sklearn.preprocessing import StandardScaler
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    st.error("scikit-learn quraşdırılmayıb. Çalışdırın: pip install scikit-learn")
+
+try:
+    import scipy.stats as stats
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+
+try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
+    st.warning("Google Gemini API mövcud deyil. Quraşdırın: pip install google-generativeai")
 
-# Streamlit konfiqurasiyası
+# Streamlit səhifəni konfiqurasiya et
 st.set_page_config(
     page_title="Bank360 Analitika",
     page_icon="🏦",
@@ -25,13 +41,14 @@ st.set_page_config(
 )
 
 def initialize_session_state():
-    """Session state başlat"""
+    """Session state-i düzgün default-larla başlat"""
     defaults = {
         'language': 'az',
         'complaint_data': None,
         'loan_data': None,
-        'customer_data': None,
-        'gemini_api_key': ""
+        'gemini_api_key': "",
+        'knowledge_base': None,
+        'initialized': False
     }
     
     for key, value in defaults.items():
@@ -39,50 +56,58 @@ def initialize_session_state():
             st.session_state[key] = value
 
 @st.cache_data
-def generate_sample_data():
-    """Nümunə məlumatlar yarad"""
+def generate_sample_data_fixed():
+    """Nümunə məlumatları düzgün xəta idarəetməsi və ardıcıllıqla yarad"""
     np.random.seed(42)
+    
+    # Şikayət mətnləri - dəqiq 100 giriş
+    base_complaint_texts = [
+        "Mobil tətbiqdə problem var, giriş edə bilmirəm",
+        "ATM-dən pul çıxarmaq mümkün olmur", 
+        "Kart komissiyası çox yüksəkdir",
+        "Filial xidməti çox yavaşdır",
+        "Kredit məbləği kifayət etmir",
+        "İnternet banking işləmir",
+        "Hesabımdan səhv məbləğ silinib",
+        "Telefon zəngləri çox tez-tez gəlir",
+        "Online ödəniş sistemi yavaş işləyir",
+        "Kart bloklanıb, səbəbi aydın deyil"
+    ]
+    
+    text_az = [np.random.choice(base_complaint_texts) for _ in range(100)]
     
     # Şikayət məlumatları
     complaint_data = {
         'id': list(range(1, 101)),
         'tarix': pd.date_range(start='2024-01-01', periods=100, freq='D'),
         'musteri_id': np.random.randint(1000, 9999, 100),
-        'kanal': np.random.choice(['Mobil', 'Filial', 'Zəng', 'Veb'], 100),
-        'kateqoriya': np.random.choice(['Kart', 'ATM', 'Mobil', 'Komissiya'], 100),
-        'metn_az': ['Problem var'] * 100,
-        'ciddilik': np.random.choice(['aşağı', 'orta', 'yüksək'], 100),
-        'status': np.random.choice(['Açıq', 'Prosesdə', 'Bağlı'], 100)
+        'kanal': np.random.choice(['Mobil Tətbiq', 'Filial', 'Zəng Mərkəzi', 'Veb Sayt'], 100),
+        'kateqoriya': np.random.choice(['Kart', 'ATM', 'Mobil', 'Komissiya', 'Filial', 'Kredit'], 100),
+        'metn_az': text_az,
+        'ciddilik': np.random.choice(['aşağı', 'orta', 'yüksək'], 100, p=[0.4, 0.4, 0.2]),
+        'status': np.random.choice(['Açıq', 'Prosesdə', 'Bağlı'], 100, p=[0.2, 0.3, 0.5]),
+        'region': np.random.choice(['Bakı', 'Gəncə', 'Sumqayıt', 'Mingəçevir', 'Şəki'], 100)
     }
     
-    # Kredit məlumatları  
+    # Kredit məlumatları
     loan_data = {
-        'musteri_id': list(range(1, 101)),
-        'yas': np.random.randint(18, 80, 100),
-        'gelir': np.random.randint(500, 5000, 100),
-        'kredit_reytingi': np.random.randint(300, 850, 100),
-        'kredit_meblegi': np.random.randint(1000, 50000, 100),
-        'muddet_ay': np.random.randint(6, 60, 100)
+        'musteri_id': list(range(1, 201)),
+        'yas': np.clip(np.random.normal(40, 12, 200).astype(int), 18, 80),
+        'gelir': np.clip(np.random.gamma(2, 1000, 200), 300, 15000),
+        'isci_veziyyeti': np.random.choice(['dövlət', 'işçi', 'sərbəst_işçi', 'işsiz'], 200, p=[0.2, 0.5, 0.2, 0.1]),
+        'kredit_reytingi': np.clip(np.random.normal(650, 100, 200).astype(int), 300, 850),
+        'kredit_meblegi': np.clip(np.random.gamma(2, 5000, 200), 1000, 100000),
+        'borc_gelir_nisbeti': np.clip(np.random.beta(2, 3, 200), 0.05, 0.95),
+        'teminat_deyeri': np.random.gamma(1.5, 8000, 200),
+        'kredit_teminat_nisbeti': np.clip(np.random.beta(3, 2, 200), 0.1, 0.95),
+        'muddet_ay': np.random.randint(6, 120, 200),
+        'region': np.random.choice(['Bakı', 'Gəncə', 'Sumqayıt', 'Mingəçevir', 'Şəki'], 200)
     }
     
-    # Müştəri məlumatları
-    customer_data = {
-        'musteri_id': list(range(1, 101)),
-        'yas': np.random.randint(18, 80, 100),
-        'gelir': np.random.randint(500, 5000, 100),
-        'muddet_ay': np.random.randint(1, 60, 100),
-        'mehsul_sayi': np.random.randint(1, 6, 100),
-        'region': np.random.choice(['Bakı', 'Gəncə', 'Sumqayıt'], 100)
-    }
-    
-    return (
-        pd.DataFrame(complaint_data),
-        pd.DataFrame(loan_data),
-        pd.DataFrame(customer_data)
-    )
+    return pd.DataFrame(complaint_data), pd.DataFrame(loan_data).head(100)
 
-class GeminiAPI:
-    """Sadə Gemini API wrapper"""
+class ImprovedGeminiAPI:
+    """Təkmilləşdirilmiş Gemini API wrapper-i"""
     
     def __init__(self, api_key=None):
         self.api_key = api_key
@@ -94,601 +119,475 @@ class GeminiAPI:
                 genai.configure(api_key=api_key)
                 self.model = genai.GenerativeModel('gemini-2.5-flash')
                 self.initialized = True
+                st.success("Gemini API uğurla başladıldı!")
             except Exception as e:
-                st.error(f"API xətası: {str(e)}")
+                st.error(f"Gemini API başladılmasında xəta: {str(e)}")
+                self.initialized = False
+        elif not GEMINI_AVAILABLE:
+            st.info("Gemini API mövcud deyil - mock cavablar istifadə edilir")
     
-    def generate_response(self, prompt, language='az'):
-        """Cavab yarat"""
-        if not self.initialized:
-            return self._mock_response(prompt)
+    def generate_response(self, prompt, language='az', max_retries=3):
+        """Cavab yarad"""
+        if not self.initialized or not self.model:
+            return self._mock_response(prompt, language)
         
-        try:
-            lang_instruction = "Azərbaycan dilində cavab ver" if language == 'az' else "Respond in English"
-            full_prompt = f"{lang_instruction}. {prompt}"
-            response = self.model.generate_content(full_prompt)
-            return response.text if response.text else self._mock_response(prompt)
-        except:
-            return self._mock_response(prompt)
+        for attempt in range(max_retries):
+            try:
+                lang_instruction = "Cavabı Azərbaycan dilində verin" if language == 'az' else "Provide response in English"
+                full_prompt = f"{lang_instruction}. {prompt}"
+                
+                response = self.model.generate_content(full_prompt)
+                
+                if response.text:
+                    return response.text
+                else:
+                    raise Exception("API-dan boş cavab")
+                    
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    st.warning(f"API çağırışı {max_retries} cəhddən sonra uğursuz: {str(e)}")
+                    return self._mock_response(prompt, language)
+                continue
+        
+        return self._mock_response(prompt, language)
     
-    def _mock_response(self, prompt):
-        """Mock cavab"""
-        return """ABB Bank analiz nəticəsi:
+    def _mock_response(self, prompt, language='az'):
+        """ABB Bank məlumatları ilə mock cavab sistemi"""
+        prompt_lower = prompt.lower()
+        
+        if any(word in prompt_lower for word in ['complaint', 'şikayət', 'problem']):
+            return """Hörmətli müştəri,
 
-Bu məlumatlar əsasında aşağıdakı tövsiyələr verilir:
+ABB Bank olaraq şikayətinizi qəbul edirik və dərhal araşdırmaya başlayırıq. Bizim üçün müştəri məmnuniyyəti prioritetdir.
 
-1. Müştəri bazasını genişləndirin
-2. Rəqəmsal xidmətləri inkişaf etdirin  
-3. Risk idarəetməsini gücləndirilir
-4. Məhsul portfelini təkmilləşdirin
-5. Müştəri məmnuniyyətini artırın
+Əlaqə məlumatlarımız:
+• Zəng Mərkəzi: 937
+• E-poçt: info@abb-bank.az
+• 24/7 online xidmət
 
-Əlavə məlumat üçün:
-- Zəng Mərkəzi: 937
-- E-poçt: info@abb-bank.az
+2-3 iş günü ərzində sizinlə əlaqə saxlayacağıq.
 
-Hörmətlə, ABB Bank"""
+Hörmətlə,
+ABB Bank Müştəri Xidmətləri"""
+        
+        elif any(word in prompt_lower for word in ['credit', 'kredit', 'loan', 'risk']):
+            return """ABB Bank kredit analizi nəticəsində:
 
-def validate_uploaded_file(uploaded_file):
-    """Fayl yoxla"""
-    if uploaded_file is None:
-        return None
-    
-    try:
-        if uploaded_file.type == 'text/csv':
-            df = pd.read_csv(uploaded_file)
-        elif 'excel' in uploaded_file.type:
-            df = pd.read_excel(uploaded_file)
+Müştərinin ödəmə qabiliyyəti orta səviyyədə qiymətləndirilir. 
+
+Əlavə məlumatlar:
+• Zəng Mərkəzi: 937
+• E-poçt: info@abb-bank.az
+• Kredit departamenti ilə əlavə məsləhətləşmə tövsiyə olunur"""
+        
         else:
-            st.error("Yalnız CSV və Excel faylları dəstəklənir")
-            return None
-        
-        if df.empty:
-            st.error("Fayl boşdur")
-            return None
-        
-        st.success(f"Fayl yükləndi: {len(df)} sətir, {len(df.columns)} sütun")
-        return df
-        
-    except Exception as e:
-        st.error(f"Fayl oxunmadı: {str(e)}")
-        return None
+            return """ABB Bank olaraq sorğunuz əsasında analiz aparılmış və müvafiq tövsiyələr hazırlanmışdır.
 
-def sidebar_navigation():
-    """Yan panel naviqasiyası"""
-    st.sidebar.title("🏦 Bank360")
+Əlaqə məlumatlarımız:
+• Zəng Mərkəzi: 937  
+• E-poçt: info@abb-bank.az
+
+Əlavə məlumat üçün müvafiq departamentlə əlaqə saxlayın."""
+
+def improved_sidebar_navigation():
+    """Təkmilləşdirilmiş yan panel"""
+    st.sidebar.markdown("### 🏦 Bank360 Analitika")
     
-    # Dil seçimi
-    language = st.sidebar.selectbox(
+    # Dil seçici
+    language_options = {'Azərbaycan': 'az', 'English': 'en'}
+    current_lang_key = 'Azərbaycan' if st.session_state.language == 'az' else 'English'
+    
+    selected_language = st.sidebar.selectbox(
         "Dil / Language",
-        ['Azərbaycan', 'English']
+        list(language_options.keys()),
+        index=list(language_options.keys()).index(current_lang_key)
     )
-    st.session_state.language = 'az' if language == 'Azərbaycan' else 'en'
+    st.session_state.language = language_options[selected_language]
     
-    # API Key
-    st.sidebar.subheader("Tənzimlər")
+    # API Key idarəetməsi
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("⚙️ Tənzimləmələr")
+    
     api_key = st.sidebar.text_input(
-        "Gemini API Key",
+        "Gemini API Açarı",
         type="password",
-        value=st.session_state.gemini_api_key
+        value=st.session_state.gemini_api_key,
+        help="AI xüsusiyyətləri üçün Google Gemini API açarınızı daxil edin"
     )
-    st.session_state.gemini_api_key = api_key
     
-    # Naviqasiya
-    st.sidebar.subheader("Səhifələr")
-    pages = ['Ana Səhifə', 'Şikayətlər', 'Kredit Riski', 'Məhsul Analizi', 'Bilik Bazası']
-    selected_page = st.sidebar.radio("Seçin:", pages)
+    if api_key != st.session_state.gemini_api_key:
+        st.session_state.gemini_api_key = api_key
+        if api_key:
+            st.sidebar.success("API açarı yeniləndi!")
+    
+    # Naviqasiya menyusu - sadəcə 4 səhifə
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📊 Naviqasiya")
+    
+    pages = ['Ana Səhifə', 'Şikayətlər', 'Kredit Riski', 'Bilik Axtarışı']
+    
+    selected_page = st.sidebar.radio(
+        "Səhifə Seçin",
+        pages
+    )
     
     return selected_page
 
+@st.cache_data
+def safe_sentiment_analysis(texts):
+    """Sentiment analizi"""
+    results = []
+    positive_words = ['yaxşı', 'əla', 'mükəmməl', 'razıyam', 'təşəkkür', 'gözəl']
+    negative_words = ['pis', 'səhv', 'problem', 'şikayət', 'narazıyam', 'yavaş']
+    
+    for text in texts:
+        try:
+            text_lower = str(text).lower()
+            
+            pos_count = sum(1 for word in positive_words if word in text_lower)
+            neg_count = sum(1 for word in negative_words if word in text_lower)
+            
+            if pos_count > neg_count:
+                sentiment = 'müsbət'
+                score = 0.7
+            elif neg_count > pos_count:
+                sentiment = 'mənfi'
+                score = 0.3
+            else:
+                sentiment = 'neytral'
+                score = 0.5
+            
+            results.append({
+                'sentiment': sentiment,
+                'score': score,
+                'confidence': 0.8
+            })
+        except:
+            results.append({
+                'sentiment': 'neytral',
+                'score': 0.5,
+                'confidence': 0.5
+            })
+    
+    return results
+
 def home_page(gemini_api):
     """Ana səhifə"""
-    st.title("🏦 Bank360 Analitika")
+    st.title("🏦 Bank360 Analitika İdarə Paneli")
     st.markdown("---")
     
     try:
-        complaint_df, loan_df, customer_df = generate_sample_data()
+        complaint_df, loan_df = generate_sample_data_fixed()
     except Exception as e:
-        st.error(f"Məlumat yüklənmə xətası: {str(e)}")
+        st.error(f"Məlumat yüklənməsində xəta: {str(e)}")
         return
     
-    # KPI-lər
+    # KPI sətriri
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Ümumi Şikayətlər", len(complaint_df))
+        st.metric("Ümumi Şikayətlər", len(complaint_df), delta=f"+{np.random.randint(5, 15)}")
+    
     with col2:
-        st.metric("CSAT Balı", "4.2/5.0")
+        csat_score = np.random.uniform(3.8, 4.5)
+        st.metric("CSAT Balı", f"{csat_score:.1f}/5.0", delta=f"+{np.random.uniform(0.1, 0.3):.1f}")
+    
     with col3:
-        high_priority = len(complaint_df[complaint_df['ciddilik'] == 'yüksək'])
-        st.metric("Yüksək Prioritet", high_priority)
+        high_severity = len(complaint_df[complaint_df['ciddilik'] == 'yüksək'])
+        st.metric("Yüksək Ciddiyyət", high_severity, delta=f"-{np.random.randint(1, 3)}")
+    
     with col4:
-        st.metric("Orta Risk", "12.5%")
+        avg_pd = loan_df['borc_gelir_nisbeti'].mean() * 0.25
+        st.metric("Orta PD", f"{avg_pd:.1%}", delta=f"{np.random.uniform(-0.01, 0.01):+.1%}")
+    
+    st.markdown("---")
     
     # Qrafiklər
-    st.markdown("---")
     col1, col2 = st.columns(2)
     
     with col1:
-        # Kateqoriya qrafiği
-        try:
-            category_counts = complaint_df['kateqoriya'].value_counts()
-            fig = px.pie(
-                values=category_counts.values,
-                names=category_counts.index,
-                title="Şikayət Kateqoriyaları"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        except:
-            st.info("Qrafik göstərilə bilmir")
+        category_counts = complaint_df['kateqoriya'].value_counts()
+        fig = px.pie(
+            values=category_counts.values,
+            names=category_counts.index,
+            title="Şikayət Kateqoriyaları"
+        )
+        st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        # Tendensiya qrafiği
-        try:
-            daily_data = complaint_df.groupby(complaint_df['tarix'].dt.date).size()
-            fig = px.line(
-                x=daily_data.index,
-                y=daily_data.values,
-                title="Gündəlik Tendensiya"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        except:
-            st.info("Qrafik göstərilə bilmir")
-    
-    # AI İntelekt
-    st.markdown("---")
-    st.subheader("🤖 AI Təhlili")
-    
-    if st.button("Biznes Təhlili Yarat"):
-        with st.spinner("Analiz yaradılır..."):
-            prompt = f"""
-            ABB Bank performans analizi:
-            
-            ABB Bank məlumatları:
-            - Bank adı: ABB Bank
-            - Zəng Mərkəzi: 937  
-            - E-poçt: info@abb-bank.az
-            
-            Məlumatlar:
-            - Şikayət sayı: {len(complaint_df)}
-            - Yüksək prioritet: {high_priority}
-            - Müştəri sayı: {len(customer_df)}
-            
-            3 əsas biznes tövsiyəsi ver.
-            """
-            
-            response = gemini_api.generate_response(prompt)
-            st.write(response)
+        daily_complaints = complaint_df.groupby(complaint_df['tarix'].dt.date).size()
+        fig = px.line(
+            x=daily_complaints.index,
+            y=daily_complaints.values,
+            title="Gündəlik Şikayət Tendensiyaları"
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
 def complaints_page(gemini_api):
     """Şikayətlər səhifəsi"""
-    st.title("Şikayətlər və Rəy Analizi")
+    st.title("Şikayətlər və Rəy Təhlili")
     st.markdown("---")
     
-    # Fayl yükləmə
-    st.subheader("Məlumat Yükləmə")
-    uploaded_file = st.file_uploader("CSV və ya Excel fayl seçin", type=['csv', 'xlsx'])
-    
-    if uploaded_file:
-        data = validate_uploaded_file(uploaded_file)
-        if data is not None:
-            st.session_state.complaint_data = data
-    else:
-        # Nümunə məlumat
-        complaint_df, _, _ = generate_sample_data()
-        st.session_state.complaint_data = complaint_df
-        st.info("Nümunə məlumatlar göstərilir")
-    
-    data = st.session_state.complaint_data
-    
-    if data is None:
-        st.warning("Məlumat yoxdur")
+    try:
+        complaint_df, _ = generate_sample_data_fixed()
+    except Exception as e:
+        st.error(f"Məlumat yüklənməsində xəta: {str(e)}")
         return
     
-    # Əsas metriklər
-    col1, col2, col3 = st.columns(3)
+    # Məlumat baxışı
+    col1, col2, col3, col4 = st.columns(4)
+    
     with col1:
-        st.metric("Ümumi Qeydlər", len(data))
+        st.metric("Ümumi Qeydlər", len(complaint_df))
     with col2:
-        if 'ciddilik' in data.columns:
-            high_sev = len(data[data['ciddilik'] == 'yüksək'])
-            st.metric("Yüksək Ciddiyyət", high_sev)
+        high_sev = len(complaint_df[complaint_df['ciddilik'] == 'yüksək'])
+        st.metric("Yüksək Ciddiyyət", high_sev)
     with col3:
-        if 'status' in data.columns:
-            open_cases = len(data[data['status'] == 'Açıq'])
-            st.metric("Açıq İşlər", open_cases)
+        open_cases = len(complaint_df[complaint_df['status'] == 'Açıq'])
+        st.metric("Açıq İşlər", open_cases)
+    with col4:
+        avg_days = np.random.randint(2, 7)
+        st.metric("Orta Həll (gün)", avg_days)
     
-    # Vizuallaşdırma
-    if st.button("Qrafiklər Göstər"):
-        if 'kateqoriya' in data.columns:
-            category_counts = data['kateqoriya'].value_counts()
-            fig = px.bar(
-                x=category_counts.index,
-                y=category_counts.values,
-                title="Kateqoriya Paylanması"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+    # Təhlil tabları
+    tab1, tab2, tab3 = st.tabs(["Sentiment Təhlili", "Kateqoriya Təhlili", "Cavab Yaradıcısı"])
     
-    # AI cavab generatoru
-    st.subheader("AI Cavab Yaradıcısı")
-    if 'metn_az' in data.columns:
-        complaint_text = st.selectbox(
-            "Şikayət seçin:",
-            data['metn_az'].head(5).tolist()
+    with tab1:
+        st.subheader("Sentiment Təhlili")
+        
+        if st.button("Sentimentləri Təhlil Et"):
+            sample_texts = complaint_df['metn_az'].head(20).tolist()
+            sentiments = safe_sentiment_analysis(sample_texts)
+            
+            if sentiments:
+                sentiment_labels = [s['sentiment'] for s in sentiments]
+                
+                sentiment_counts = pd.Series(sentiment_labels).value_counts()
+                fig = px.pie(
+                    values=sentiment_counts.values,
+                    names=sentiment_counts.index,
+                    title="Sentiment Paylanması"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+    
+    with tab2:
+        st.subheader("Kateqoriya Təhlili")
+        
+        category_counts = complaint_df['kateqoriya'].value_counts()
+        
+        fig = px.bar(
+            x=category_counts.values,
+            y=category_counts.index,
+            orientation='h',
+            title="Kateqoriyalara görə Şikayətlər"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab3:
+        st.subheader("AI Cavab Yaradıcısı")
+        
+        complaint_options = complaint_df['metn_az'].head(5).tolist()
+        
+        selected_complaint = st.selectbox(
+            "Cavab yaratmaq üçün şikayət seçin:",
+            complaint_options
         )
         
-        if st.button("Cavab Yarat"):
-            prompt = f"""
-            ABB Bank olaraq bu şikayətə cavab yarat:
-            
-            Bank: ABB Bank
-            Zəng: 937
-            E-poçt: info@abb-bank.az
-            
-            Şikayət: {complaint_text}
-            
-            Peşəkar və həlledici cavab ver.
-            """
-            
-            response = gemini_api.generate_response(prompt)
+        if st.button("Peşəkar Cavab Yarat"):
+            response = gemini_api.generate_response(
+                f"""ABB Bank olaraq bu müştəri şikayətinə peşəkar cavab yaradın:
+                
+                Şikayət: {selected_complaint}
+                
+                Cavab hörmətli, peşəkar və həllledici olsun."""
+            )
             st.write("**Yaradılan Cavab:**")
             st.write(response)
 
 def credit_risk_page(gemini_api):
-    """Kredit risk səhifəsi"""
-    st.title("Kredit Risk Analizi")
+    """Kredit riski səhifəsi"""
+    st.title("Kredit Riski və Gözlənilən İtki Təhlili")
     st.markdown("---")
     
-    st.subheader("Risk Hesablaması")
-    
-    # Input formalar
     col1, col2 = st.columns(2)
     
     with col1:
+        st.write("**Şəxsi Məlumatlar**")
         age = st.slider("Yaş", 18, 80, 35)
-        income = st.number_input("Gəlir (AZN)", 300, 10000, 1500)
-        employment = st.selectbox("İş", ['dövlət', 'özəl', 'sərbəst'])
+        income = st.number_input("Aylıq Gəlir (AZN)", 300.0, 15000.0, 1500.0)
+        employment = st.selectbox("İş Vəziyyəti", ['dövlət', 'işçi', 'sərbəst_işçi', 'işsiz'])
         credit_score = st.slider("Kredit Reytinqi", 300, 850, 650)
     
     with col2:
-        loan_amount = st.number_input("Kredit Məbləği", 1000, 100000, 25000)
-        collateral = st.number_input("Təminat", 0, 200000, 30000)
-        debt_ratio = st.slider("Borc/Gəlir", 0.0, 1.0, 0.3)
-        term = st.slider("Müddət (ay)", 6, 120, 36)
+        st.write("**Kredit Məlumatları**")
+        loan_amount = st.number_input("Kredit Məbləği (AZN)", 1000.0, 100000.0, 25000.0)
+        debt_to_income = st.slider("Borc-Gəlir Nisbəti", 0.0, 1.0, 0.3)
+        collateral_value = st.number_input("Təminat Dəyəri (AZN)", 0.0, 200000.0, 30000.0)
+        loan_to_value = st.slider("Kredit-Təminat Nisbəti", 0.0, 1.0, 0.8)
     
-    if st.button("Risk Hesabla"):
-        # Sadə risk hesablaması
-        base_risk = 0.15
+    if st.button("Risk Metriklər Hesabla"):
+        # Sadələşdirilmiş PD hesablama
+        base_pd = 0.15
         
-        if age < 25 or age > 65:
-            base_risk += 0.03
-        if income < 1000:
-            base_risk += 0.05
-        if credit_score < 600:
-            base_risk += 0.1
-        if debt_ratio > 0.5:
-            base_risk += 0.05
+        # Yaş faktoru
+        age_factor = 0.03 if age < 25 or age > 65 else (-0.02 if 35 <= age <= 50 else 0)
         
-        risk_score = max(0.01, min(0.95, base_risk))
+        # Gəlir faktoru
+        income_factor = -0.00002 * income if income > 0 else 0.1
         
-        # Nəticələr
+        # İş faktoru
+        emp_factors = {'dövlət': -0.03, 'işçi': -0.01, 'sərbəst_işçi': 0.02, 'işsiz': 0.15}
+        employment_factor = emp_factors.get(employment, 0)
+        
+        # Kredit reytinq faktoru
+        credit_factor = -0.0002 * (credit_score - 600)
+        
+        pd_score = max(0.01, min(0.95, base_pd + age_factor + income_factor + employment_factor + credit_factor))
+        
+        # LGD hesabla
+        lgd = 0.2 if collateral_value >= loan_amount else max(0.3, 0.8 - (collateral_value/loan_amount * 0.5))
+        
+        # EAD və Expected Loss
+        ead = loan_amount * 0.85
+        expected_loss = pd_score * lgd * ead
+        
+        # Nəticələri göstər
+        st.markdown("---")
+        st.subheader("Risk Qiymətləndirmə Nəticələri")
+        
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("Default Risk (PD)", f"{risk_score:.2%}")
+            risk_level = "Yüksək" if pd_score > 0.2 else "Orta" if pd_score > 0.1 else "Aşağı"
+            st.metric("Defolt Ehtimalı (PD)", f"{pd_score:.2%}")
+            st.write(f"**Risk Səviyyəsi:** {risk_level}")
+        
         with col2:
-            lgd = 0.45 if collateral < loan_amount else 0.25
-            st.metric("Loss Given Default", f"{lgd:.2%}")
+            st.metric("Defoltda İtki (LGD)", f"{lgd:.2%}")
+            st.metric("Defoltda Məruz Qalma (EAD)", f"{ead:,.0f} AZN")
+        
         with col3:
-            expected_loss = risk_score * lgd * loan_amount
-            st.metric("Expected Loss", f"{expected_loss:,.0f} AZN")
-        
-        # AI təhlili
-        if st.button("Risk Təhlili"):
-            prompt = f"""
-            ABB Bank kredit risk analizi:
-            
-            Bank: ABB Bank
-            Zəng: 937
-            E-poçt: info@abb-bank.az
-            
-            Müştəri profili:
-            - Yaş: {age}
-            - Gəlir: {income} AZN
-            - Kredit: {loan_amount} AZN
-            - Risk: {risk_score:.2%}
-            
-            Risk qiymətləndirmə və tövsiyə ver.
-            """
-            
-            analysis = gemini_api.generate_response(prompt)
-            st.write(analysis)
+            st.metric("Gözlənilən İtki (EL)", f"{expected_loss:,.0f} AZN")
 
-def product_insights_page(gemini_api):
-    """Məhsul analizi səhifəsi"""
-    st.title("Məhsul Analizi")
+def knowledge_search_page(gemini_api):
+    """Bilik axtarışı səhifəsi"""
+    st.title("Bilik Axtarışı və RAG Sistemi")
     st.markdown("---")
     
-    # Fayl yükləmə
-    st.subheader("Məlumat Yükləmə")
-    uploaded_file = st.file_uploader("Müştəri məlumatları faylı", type=['csv', 'xlsx'])
-    
-    if uploaded_file:
-        customer_df = validate_uploaded_file(uploaded_file)
-        if customer_df is not None:
-            st.session_state.customer_data = customer_df
-    else:
-        _, _, customer_df = generate_sample_data()
-        st.session_state.customer_data = customer_df
-        st.info("Nümunə məlumatlar istifadə edilir")
-    
-    data = st.session_state.customer_data
-    
-    if data is None:
-        st.warning("Məlumat yoxdur")
-        return
-    
-    # Məlumat xülasəsi
-    st.subheader("Məlumat Xülasəsi")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Müştəri Sayı", len(data))
-    with col2:
-        st.metric("Sütun Sayı", len(data.columns))
-    with col3:
-        numeric_cols = data.select_dtypes(include=[np.number]).columns
-        st.metric("Rəqəmsal Sütunlar", len(numeric_cols))
-    
-    # Sütunları göstər
-    st.write("**Sütunlar:**", list(data.columns))
-    
-    # Analiz seçimi
-    analysis_type = st.selectbox(
-        "Analiz növü:",
-        ["Əsas Statistika", "Müştəri Profili", "AI Tövsiyələri", "Vizuallar"]
-    )
-    
-    if analysis_type == "Əsas Statistika":
-        show_basic_stats(data)
-    elif analysis_type == "Müştəri Profili":
-        show_customer_profile(data)
-    elif analysis_type == "AI Tövsiyələri":
-        show_ai_recommendations(data, gemini_api)
-    elif analysis_type == "Vizuallar":
-        show_visualizations(data)
-
-def show_basic_stats(df):
-    """Əsas statistika göstər"""
-    st.subheader("Əsas Statistika")
-    
-    # Rəqəmsal sütunlar
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    if len(numeric_cols) > 0:
-        st.write("**Rəqəmsal Sütunlar:**")
-        st.dataframe(df[numeric_cols].describe())
-    
-    # Kateqoriya sütunları
-    cat_cols = df.select_dtypes(include=['object']).columns
-    for col in cat_cols:
-        unique_vals = df[col].nunique()
-        if unique_vals <= 10:
-            st.write(f"**{col}:**")
-            st.write(df[col].value_counts())
-
-def show_customer_profile(df):
-    """Müştəri profili göstər"""
-    st.subheader("Müştəri Profili")
-    
-    # İlk sütunu ID kimi götür
-    id_col = df.columns[0]
-    customer_ids = df[id_col].head(10).tolist()
-    
-    selected_id = st.selectbox("Müştəri seçin:", customer_ids)
-    
-    if selected_id:
-        customer = df[df[id_col] == selected_id].iloc[0]
-        
-        st.write("**Müştəri Məlumatları:**")
-        for col in df.columns:
-            st.write(f"**{col}:** {customer[col]}")
-        
-        # Sadə tövsiyələr
-        st.write("**Tövsiyələr:**")
-        recommendations = []
-        
-        # Yaş əsaslı
-        for age_col in ['age', 'yas']:
-            if age_col in df.columns:
-                age = customer[age_col]
-                if age < 30:
-                    recommendations.append("Gənclik məhsulları")
-                elif age < 50:
-                    recommendations.append("Premium xidmətlər")
-                else:
-                    recommendations.append("Pensiya planları")
-                break
-        
-        # Gəlir əsaslı
-        for income_col in ['income', 'gelir']:
-            if income_col in df.columns:
-                income = customer[income_col]
-                if income > 3000:
-                    recommendations.append("Yüksək gəlirli paket")
-                elif income > 1500:
-                    recommendations.append("Orta səviyyə paket")
-                else:
-                    recommendations.append("Əsas paket")
-                break
-        
-        if not recommendations:
-            recommendations = ["Kredit kartı", "Əmanət hesabı", "Mobil banking"]
-        
-        for rec in recommendations:
-            st.write(f"• {rec}")
-
-def show_ai_recommendations(df, gemini_api):
-    """AI tövsiyələri göstər"""
-    st.subheader("AI Tövsiyələri")
-    
-    if st.button("Strategiya Yarat", type="primary"):
-        with st.spinner("AI strategiya yaradır..."):
-            summary = f"""
-            Müştəri bazası analizi:
-            - Müştəri sayı: {len(df)}
-            - Sütunlar: {list(df.columns)}
-            - Rəqəmsal sütunlar: {list(df.select_dtypes(include=[np.number]).columns)}
-            """
-            
-            prompt = f"""
-            ABB Bank strategiya tövsiyələri:
-            
-            ABB Bank:
-            - Zəng: 937
-            - E-poçt: info@abb-bank.az
-            
-            Məlumat: {summary}
-            
-            5 strategiya tövsiyəsi:
-            1. Müştəri seqmentasiyası
-            2. Məhsul inkişafı  
-            3. Rəqəmsal transformasiya
-            4. Risk idarəetməsi
-            5. Marketinq strategiyası
-            """
-            
-            response = gemini_api.generate_response(prompt)
-            st.write(response)
-
-def show_visualizations(df):
-    """Vizuallaşdırma göstər"""
-    st.subheader("Vizuallaşdırma")
-    
-    # Rəqəmsal sütunlar üçün histoqram
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    if len(numeric_cols) > 0:
-        selected_col = st.selectbox("Histoqram üçün sütun:", numeric_cols)
-        if selected_col:
-            fig = px.histogram(df, x=selected_col, title=f"{selected_col} Paylanması")
-            st.plotly_chart(fig, use_container_width=True)
-    
-    # Kateqoriya sütunları
-    cat_cols = df.select_dtypes(include=['object']).columns
-    valid_cats = [col for col in cat_cols if df[col].nunique() <= 10]
-    
-    if valid_cats:
-        selected_cat = st.selectbox("Bar chart üçün:", valid_cats)
-        if selected_cat:
-            counts = df[selected_cat].value_counts()
-            fig = px.bar(x=counts.index, y=counts.values, title=f"{selected_cat} Sayları")
-            st.plotly_chart(fig, use_container_width=True)
-
-def knowledge_base_page(gemini_api):
-    """Bilik bazası səhifəsi"""
-    st.title("Bilik Bazası")
-    st.markdown("---")
-    
-    # Sadə bilik bazası
+    # Bilik bazasını başlat
     if 'kb_docs' not in st.session_state:
         st.session_state.kb_docs = [
             {
-                'title': 'ABB Bank Kredit Kartı',
-                'content': 'ABB Bank kredit kartı: 2 AZN aylıq komissiya, 1.5% nağd çıxarma. 24/7 online. Məlumat: 937, info@abb-bank.az'
+                'title': 'ABB Bank Kredit Kartı Qaydalari',
+                'content': 'ABB Bank kredit kartının istifadə qaydalari: Aylıq komissiya 2 AZN, nağd pul çıxarma 1.5%, minimum ödəniş 5%. Əlavə məlumat üçün: 937 və ya info@abb-bank.az',
+                'category': 'məhsullar'
             },
             {
-                'title': 'ABB Mobil Banking', 
-                'content': 'Mobil tətbiq: pul köçürmə, hesab yoxlama, kommunal ödəniş. Biometrik giriş. Dəstək: 937'
+                'title': 'ABB Mobil Banking Xidmətləri',
+                'content': 'ABB mobil tətbiq vasitəsilə: pul köçürmələri, hesab yoxlanması, kommunal ödənişlər, kredit ödənişləri. Texniki dəstək: 937, info@abb-bank.az',
+                'category': 'rəqəmsal'
             },
             {
-                'title': 'ABB Kreditlər',
-                'content': 'Fərdi kreditlər: min 500 AZN gəlir, maks 50,000 AZN, 60 ay, faiz 12-18%. Məsləhət: 937'
+                'title': 'ABB Bank Kredit Şərtləri',
+                'content': 'ABB Bank fərdi kreditlər: minimum gəlir 500 AZN, maksimum 50,000 AZN, müddət 60 aya qədər, faiz 12-18%. Məsləhət üçün: 937 və ya info@abb-bank.az',
+                'category': 'kreditlər'
+            },
+            {
+                'title': 'ABB Bank Əlaqə Məlumatları',
+                'content': 'ABB Bank əlaqə məlumatları: Zəng Mərkəzi 937 (24/7), E-poçt info@abb-bank.az, Online banking, mobil tətbiq.',
+                'category': 'ümumi'
             }
         ]
     
-    # Yeni sənəd əlavə etmə
-    st.subheader("Yeni Sənəd")
-    with st.expander("Sənəd Əlavə Et"):
-        title = st.text_input("Başlıq")
-        content = st.text_area("Məzmun")
-        
-        if st.button("Əlavə Et"):
-            if title and content:
-                st.session_state.kb_docs.append({
-                    'title': title,
-                    'content': content
-                })
-                st.success("Əlavə edildi!")
-                st.rerun()
+    # Axtarış interfeysi
+    st.subheader("Bilik Axtarışı")
     
-    # Sənəd sayı
-    st.metric("Sənəd Sayı", len(st.session_state.kb_docs))
-    
-    # Axtarış
-    st.subheader("Axtarış")
-    query = st.text_input("Sual verin:", placeholder="Kredit kartı haqqında...")
+    query = st.text_input(
+        "Bank xidmətləri haqqında sual verin:",
+        placeholder="Kredit kartının komissiyası nə qədərdir?"
+    )
     
     if query:
         # Sadə axtarış
-        results = []
-        for doc in st.session_state.kb_docs:
-            if query.lower() in doc['content'].lower() or query.lower() in doc['title'].lower():
-                results.append(doc)
+        relevant_docs = search_documents(st.session_state.kb_docs, query)
         
-        if results:
-            context = " ".join([doc['content'] for doc in results[:2]])
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.write("**AI Cavabı:**")
             
-            prompt = f"""
-            ABB Bank bilik bazası cavabı:
-            
-            ABB Bank:
-            - Zəng: 937
-            - E-poçt: info@abb-bank.az
-            
-            Kontekst: {context}
-            Sual: {query}
-            
-            Dəqiq və faydalı cavab ver.
-            """
-            
-            with st.spinner("Cavab hazırlanır..."):
-                answer = gemini_api.generate_response(prompt)
-                st.write("**Cavab:**")
+            if relevant_docs:
+                context = " ".join([doc['content'] for doc in relevant_docs[:2]])
+                
+                answer_prompt = f"""
+                ABB Bank bilik bazası əsasında bu suala cavab verin:
+                
+                Kontekst: {context}
+                Sual: {query}
+                
+                ABB Bank adından faydalı və dəqiq cavab verin.
+                """
+                
+                answer = gemini_api.generate_response(answer_prompt, st.session_state.language)
                 st.write(answer)
+            else:
+                st.write("Təəssüf ki, sualınız üçün müvafiq məlumat tapa bilmədim.")
+        
+        with col2:
+            st.write("**Müvafiq Sənədlər:**")
             
-            st.write("**Əlaqəli Sənədlər:**")
-            for doc in results[:3]:
-                with st.expander(doc['title']):
-                    st.write(doc['content'])
-        else:
-            st.write("Nəticə tapılmadı.")
+            for doc in relevant_docs[:3]:
+                with st.expander(f"{doc['title']}"):
+                    st.write(doc['content'][:200] + "...")
+
+def search_documents(docs, query):
+    """Sadə sənəd axtarış tətbiqi"""
+    query_words = query.lower().split()
+    
+    scored_docs = []
+    for doc in docs:
+        content_lower = doc['content'].lower()
+        title_lower = doc['title'].lower()
+        
+        content_score = sum(1 for word in query_words if word in content_lower)
+        title_score = sum(2 for word in query_words if word in title_lower)
+        
+        total_score = content_score + title_score
+        
+        if total_score > 0:
+            doc_copy = doc.copy()
+            doc_copy['score'] = total_score / len(query_words)
+            scored_docs.append(doc_copy)
+    
+    return sorted(scored_docs, key=lambda x: x['score'], reverse=True)
 
 def main():
     """Əsas tətbiq"""
     initialize_session_state()
     
-    # API açarını yüklə
-    try:
-        if not st.session_state.gemini_api_key:
+    # API açarını yükləməyə çalış
+    if not st.session_state.gemini_api_key and not st.session_state.initialized:
+        try:
             st.session_state.gemini_api_key = st.secrets.get("GEMINI_API_KEY", "")
-    except:
-        pass
+        except:
+            pass
+        st.session_state.initialized = True
     
-    # API başlat
-    gemini_api = GeminiAPI(st.session_state.gemini_api_key)
+    # API-ni başlat
+    gemini_api = ImprovedGeminiAPI(st.session_state.gemini_api_key)
     
     # Naviqasiya
-    selected_page = sidebar_navigation()
+    selected_page = improved_sidebar_navigation()
     
-    # Səhifə yönləndirmə
+    # Müvafiq səhifəyə yönləndir
     if selected_page == 'Ana Səhifə':
         home_page(gemini_api)
     elif selected_page == 'Şikayətlər':
         complaints_page(gemini_api)
     elif selected_page == 'Kredit Riski':
         credit_risk_page(gemini_api)
-    elif selected_page == 'Məhsul Analizi':
-        product_insights_page(gemini_api)
-    elif selected_page == 'Bilik Bazası':
-        knowledge_base_page(gemini_api)
+    elif selected_page == 'Bilik Axtarışı':
+        knowledge_search_page(gemini_api)
 
 if __name__ == "__main__":
     main()
