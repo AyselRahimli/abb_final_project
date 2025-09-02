@@ -1,5 +1,4 @@
-# Bank360 - Düzəldilmiş və Azərbaycan dilində
-# Bu fayl əsas problemlərin həllini ehtiva edir
+# Bank360 
 
 import streamlit as st
 import pandas as pd
