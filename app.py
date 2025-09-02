@@ -506,7 +506,7 @@ def home_page_improved(gemini_api):
     st.markdown("---")
     st.subheader("🤖 AI tərəfindən yaradılan təhillər")
     
-    if st.button("Biznes Təhlilləri Yarad"):
+    if st.button("Biznes Təhlilləri Yarat"):
         with st.spinner("Məlumatlar təhlil edilir və nəticələr yaradılır..."):
             insights_prompt = f"""
             ABB Bank-ın performans məlumatlarını təhlil edin və 3 əsas biznes nəticəsi verin:
