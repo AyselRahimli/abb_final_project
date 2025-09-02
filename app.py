@@ -839,7 +839,7 @@ def credit_risk_page_improved(gemini_api):
                 - Gözlənilən İtki: {expected_loss:,.0f} AZN
                 - Risk Səviyyəsi: {risk_level}
                 
-                ABB Bank-ın risk idarəetmə siyasətini nəzərə alaraq əsas risk faktorlarını izah edin və tövsiyələr verin.
+                ABB Bank-ın risk idarəetmə siyasətini nəzərə alaraq əsas qərar verin və izah edin qərarın səbəbini.
                 """
                 
                 try:
